@@ -1,25 +1,29 @@
-ul{
-
+ul {
     list-style-type: none;
-   text-align: center;
-   background-color: black;
-   color: white;
-   font-size: large;
+    text-align: center;
+    background-color: black;
+    color: white;
+    font-size: large;
 }
-li{
+
+li {
     display: inline;
     padding: 30px;
-    
+
 }
-a{
-    color:white;
+
+a {
+    color: white;
 }
-ul2{
-   display:block;
-   
+
+ul2 {
+    display: block;
 }
-li2{
+
+li2 {
     padding: 30px;
 }
-h1
-{ text-align: center;}
+
+h1 {
+    text-align: center;
+}

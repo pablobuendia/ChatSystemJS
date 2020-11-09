@@ -2,48 +2,31 @@
 <meta charset="UTF-8">
 
 <head>
-    <title>TalkApp</title>
+    <title>Administra tus mensajes</title>
     <link rel="stylesheet" href="estilo.css">
 </head>
 
 <body>
-    <h1> <u>
-        sitio oficial de TalkApp
+    <div>
+        <form action="/broker/123/topics" method="GET">
+            <input type="submit" value="LISTAS DEL TOPICO"><br>
+        </form>
+    </div>
+    <br><br>
+    <div>
+        <form action="/broker/123/topics/miTopico1" method="GET">
+            <input type="text" id="solicitarTopico" name="solicitarTopico"><br>
+            <input type="submit" value="SOLICITAR TOPICO">
+        </form>
+    </div>
+    <br><br>
+    <div>
+        <form action="/broker/123/topics/miTopico1" method="DELETE">
+            <input type="text" id="borrarTopico" name="borrarTopico"><br>
+            <input type="submit" value="BORRAR LOS MENSAJES DEL TOPICO">
+        </form>
+    </div>
 
-    </u>  </h1>
-    <ul>
-        <li> <a href="nosotros.html ">
-            ¿Quienes somos? 
-        </a> </li>
-        <li> <a>Administra los mensajes </a> </li>
-        <li> <a>FAQ</a> 
-        <li> <a> Contactenos </a> </li>
-
-    </ul>
-    <h2> Descripción del proyecto</h2>
-    <p>
-        Este es un proyecto correspondiente a la materia Sistemas Distribuidos de la carrera Ingenieria en informatica
-        dictada en la UNMDP<br>
-        En este sitio usted podra administrar sus mensajes y ademas enterarse de las ultimas novedades respecto a las
-        actualizaciones de nuestra app
-
-
-    </p>
-    <h3>
-        HITOS DEL PROYECTO
-        <p>
-            <ul2>
-                <li2> 2 de noviembre de 2020 : Presentación de Planificación y propuesta de formato<br>
-                    
-                </li2>
-                
-                
-            </ul2>
-
-        </p>
-
-
-    </h3>
 </body>
 
 </html>
