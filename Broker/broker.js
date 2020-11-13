@@ -1,30 +1,36 @@
 // broker.js (Intento 1) Pablo Buendia
 const zmq = require('zeromq');
-const readline = require('readline');
+const subSocket = zmq.socket('xsub');
+const pubSocket = zmq.socket('xpub');
+var port;
+var direccion = 'tcp://127.0.0.1:';
 
-var r1 = readline.createInterface({
+const readline = require('readline');
+var rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
 
-var brokers = [];
-
-r1.question('Escriba el numero de brokers: ', function(cant) {
-    for (let index = 0; index < cant; index++) {
-        r1.question('Escriba el id del broker ' + index + ':', function(nombre) {
-            // definimos 2 sockets: el que escucha todos los mensajes entrantes (subSocket), y el que va a enviar los mensajes a destino (pubSocket)
-            // ACA HABRIA QUE PUSHEAR UN NUEVO BROKER AL ARRAY, EL TEMA SERIA COMO HACER PARA CREAR EL OBJETO
-            // Y TODO ESO QUE TODAVIA NO TENGO TAN CLARO
-            //brokers.push(new broker());
-        });
-    }
-})
-
-brokers.forEach(broker => {
-    // ambos sockets van a ser modo servidor, ya que los publicadores y suscriptores de nuestro sistema, los clientes, se conectaran al broker (y no al revés)
-    broker.subSocket.bindSync('tcp://127.0.0.1:3000');
-    broker.pubSocket.bindSync('tcp://127.0.0.1:3001');
+console.log('Ingrese los puertos a utilizar el broker:');
+rl.on('line', (puerto) => {
+    let dir = direccion.concat(puerto);
+    console.log('Direccion final: ', dir);
+    subSocket.bindSync(dir);
+    puerto =eval(puerto + 1).toString();
+    dir ='';
+    dir = direccion.concat(puerto);
+    console.log('Direccion final: ', dir);
+    pubSocket.bindSync(dir);
+    rl.close();
 });
+/*
+O bien podemos pedirle al usuario que ingrese los dos puerto manualmente o pedirle uno solo y que el otro sea el siguiente 
+Ej: 3000 (se ingresa) y el siguiente usado es 3001
+La desventaja es que si otra persona que no sea nosotros lo corre no va a saber que el 3001 está en uso y puede llevar
+a un error.
+*/
+
+
 
 
 // redirige todos los mensajes que recibimos
@@ -36,3 +42,5 @@ subSocket.on('message', function (topic, message) {
 pubSocket.on('message', function (topic) {
 	subSocket.send(topic)
 });
+
+//El broker que maneja "message/all" no tiene que mandar el mensaje al cliente que lo publico
