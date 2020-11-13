@@ -16,7 +16,8 @@ rl.on('line', (puerto) => {
     let dir = direccion.concat(puerto);
     console.log('Direccion final: ', dir);
     subSocket.bindSync(dir);
-    puerto =eval(puerto + 1).toString();
+    puerto =(eval(puerto )+1).toString();
+    console.log (puerto);
     dir ='';
     dir = direccion.concat(puerto);
     console.log('Direccion final: ', dir);
