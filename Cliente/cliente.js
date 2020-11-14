@@ -12,7 +12,23 @@ r1.question('Ingrese su id: ', (answer) => {
 // subber.js
 const zmq = require('zeromq'),
             subSocket = zmq.socket('sub'),
-            pubSocket = zmq.socket('pub');
+            pubSocket = zmq.socket('pub'),
+            requester = zmq.socket('req');
+
+// Connects REQ socket to tcp://localhost:5555
+// Sends "Hello" to server.
+
+// socket to talk to server
+requester.connect("tcp://127.0.0.1:5555");
+console.log("Connecting to hello world server...");
+
+requester.on("message", function(reply) {
+  console.log("Received reply : [", reply.toString(), ']');
+});
+
+requester.send("Hello");
+
+
 /*
 La conexión siguiente se tiene que hacer a partir de la devolución del coordinador a donde se tiene que conectar
 */
@@ -27,7 +43,9 @@ Porque se tiene que conectar a diferentes puertos para recibir mensaje de los di
 subSocket.on('message', function(topic, message) {
     let mensaje = message.toString();
     mensaje = JSON.parse(mensaje);
-    console.log('Recibio topico: ', topic.toString(), ' con mensaje: ', mensaje.mensaje);
+    if (mensaje.id_cliente != id_cliente){
+        console.log('Recibio topico: ', topic.toString(), ' con mensaje: ', mensaje.mensaje);
+    }
 });
 
 
