@@ -1,0 +1,27 @@
+{
+  "name": "chatsystemjs",
+  "version": "1.0.0",
+  "description": "Aplicacion de chat construida en Node usando zeromq",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pablobuendia/ChatSystemJS.git"
+  },
+  "keywords": [
+    "node",
+    "zeromq"
+  ],
+  "author": "Buendia, Pablo; Fritz, Ezequiel; Paez, Manuel; Pellegrini, Constanza",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/pablobuendia/ChatSystemJS/issues"
+  },
+  "homepage": "https://github.com/pablobuendia/ChatSystemJS#readme",
+  "dependencies": {
+    "bootstrap": "^4.5.3",
+    "zeromq": "^5.2.0"
+  }
+}

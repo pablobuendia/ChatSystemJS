@@ -1,4 +1,4 @@
-ul {
+/*ul {
     list-style-type: none;
     text-align: center;
     background-color: black;
@@ -9,7 +9,6 @@ ul {
 li {
     display: inline;
     padding: 30px;
-
 }
 
 a {
@@ -26,4 +25,8 @@ li2 {
 
 h1 {
     text-align: center;
+}*/
+
+body {
+    padding-top: 3.5rem;
 }
