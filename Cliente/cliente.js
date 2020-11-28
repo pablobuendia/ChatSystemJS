@@ -1,4 +1,6 @@
 const readline = require('readline');
+var puertoNTP=4444;
+var  delay;
 var id_cliente; //----------------- IMPORTANTE 
 var r1 = readline.createInterface({
     input: process.stdin,
@@ -11,6 +13,7 @@ r1.question('Ingrese su id: ', (answer) => {
 
 // subber.js
 const zmq = require('zeromq'),
+ const net =require('net');
             subSocket = zmq.socket('sub'),
             pubSocket = zmq.socket('pub'),
             requester = zmq.socket('req');
@@ -51,7 +54,8 @@ subSocket.on('message', function(topic, message) {
 
 r1.on('line', (mensaje) => {
     let arrayMensaje = mensaje.split(':');
-    let fecha = new Date();
+    let aux= new Date().now();
+    let fecha = new Date(aux+delay);
     fecha = fecha.toISOString();
     let message = '{"emisor":"'+id_cliente+'", "mensaje":"'+arrayMensaje[1]+'", "fecha":"'+fecha+'"}';
     pubSocket.send([arrayMensaje[0], message]);
@@ -64,5 +68,26 @@ Ejemplo:
     All: hola
     id_cliente: hola
 */
+var clienteNTP =net.createConnection(puertoNTP , "127.0.0.1",function(){
+var intervalo = 120;
+setInterval(() => {
+
+ var T1 = (new Date()).getTime().toISOString();
+      client.write(JSON.stringify(T1));
+    
+}, intervalo *1000);
+});
 
 
+client.on('data', function (data) {
+    var T4 = (new Date()).getTime();
+  
+    // obtenemos hora del servidor
+    var times = data.toString().split(",");
+    var T1 = parseInt(times[0]);
+    var T2 = parseInt(times[1]);
+    var T3 = parseInt(times[2]);
+  
+    // calculamos delay de la red
+    delay = ((T2 - T1) + (T4 - T3)) / 2;
+});
