@@ -1,6 +1,7 @@
 const readline = require('readline');
-var puertoNTP=4444;
-var  delay;
+const intervalo = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
+const puertoNTP = 4444;
+var delay;
 var id_cliente; //----------------- IMPORTANTE 
 var r1 = readline.createInterface({
     input: process.stdin,
@@ -9,14 +10,14 @@ var r1 = readline.createInterface({
 
 r1.question('Ingrese su id: ', (answer) => {
     id_cliente = answer;
-}); 
+});
 
 // subber.js
 const zmq = require('zeromq'),
- const net =require('net');
-            subSocket = zmq.socket('sub'),
-            pubSocket = zmq.socket('pub'),
-            requester = zmq.socket('req');
+    const net = require('net');
+subSocket = zmq.socket('sub'),
+    pubSocket = zmq.socket('pub'),
+    requester = zmq.socket('req');
 
 // Connects REQ socket to tcp://localhost:5555
 // Sends "Hello" to server.
@@ -25,8 +26,8 @@ const zmq = require('zeromq'),
 requester.connect("tcp://127.0.0.1:5555");
 console.log("Connecting to hello world server...");
 
-requester.on("message", function(reply) {
-  console.log("Received reply : [", reply.toString(), ']');
+requester.on("message", function (reply) {
+    console.log("Received reply : [", reply.toString(), ']');
 });
 
 requester.send("Hello");
@@ -43,10 +44,10 @@ subSocket.subscribe('All');
 PREGUNTA: por cada broker al que se quiere conectar debe tener un subSocket y un pubSocket? ---------------------------------- PREGUNTA
 Porque se tiene que conectar a diferentes puertos para recibir mensaje de los distintos topicos
 */
-subSocket.on('message', function(topic, message) {
+subSocket.on('message', function (topic, message) {
     let mensaje = message.toString();
     mensaje = JSON.parse(mensaje);
-    if (mensaje.id_cliente != id_cliente){
+    if (mensaje.id_cliente != id_cliente) {
         console.log('Recibio topico: ', topic.toString(), ' con mensaje: ', mensaje.mensaje);
     }
 });
@@ -54,10 +55,10 @@ subSocket.on('message', function(topic, message) {
 
 r1.on('line', (mensaje) => {
     let arrayMensaje = mensaje.split(':');
-    let aux= new Date().now();
-    let fecha = new Date(aux+delay);
+    let aux = new Date().now();
+    let fecha = new Date(aux + delay);
     fecha = fecha.toISOString();
-    let message = '{"emisor":"'+id_cliente+'", "mensaje":"'+arrayMensaje[1]+'", "fecha":"'+fecha+'"}';
+    let message = '{"emisor":"' + id_cliente + '", "mensaje":"' + arrayMensaje[1] + '", "fecha":"' + fecha + '"}';
     pubSocket.send([arrayMensaje[0], message]);
     r1.close();
 }); //MEJORAR, solamente permite que envie 1 mensaje y hasta ahí llego. 
@@ -68,26 +69,32 @@ Ejemplo:
     All: hola
     id_cliente: hola
 */
-var clienteNTP =net.createConnection(puertoNTP , "127.0.0.1",function(){
-var intervalo = 120;
-setInterval(() => {
+var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
+    setInterval(() => {
 
- var T1 = (new Date()).toISOString();
-      client.write(JSON.stringify(T1));
-    
-}, intervalo *1000);
+        var T1 = (new Date()).getTime().toISOString();
+        console.log("Escribiendo desde cliente " + id_cliente + "...")
+        clienteNTP.write(JSON.stringify({
+            t1: T1
+        }));
+
+    }, intervalo * 1000);
 });
 
 
 clienteNTP.on('data', function (data) {
+    console.log("Cliente " + id_cliente + " Se recibio respuesta de servidor NTP.")
+
     var T4 = (new Date()).getTime();
-  
-    // obtenemos hora del servidor
-    var times = data.toString().split(",");
-    var T1 = parseInt(times[0]);
-    var T2 = parseInt(times[1]);
-    var T3 = parseInt(times[2]);
-  
+
+    // Obtenemos la hora del servidor
+    var times = JSON.parse(data);
+    var T1 = (new Date(times.t1)).getTime();
+    var T2 = (new Date(times.t2)).getTime();
+    var T3 = (new Date(times.t3)).getTime();
+
     // calculamos delay de la red
     delay = ((T2 - T1) + (T4 - T3)) / 2;
+
+    console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
 });
