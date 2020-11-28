@@ -72,14 +72,14 @@ var clienteNTP =net.createConnection(puertoNTP , "127.0.0.1",function(){
 var intervalo = 120;
 setInterval(() => {
 
- var T1 = (new Date()).getTime().toISOString();
+ var T1 = (new Date()).toISOString();
       client.write(JSON.stringify(T1));
     
 }, intervalo *1000);
 });
 
 
-client.on('data', function (data) {
+clienteNTP.on('data', function (data) {
     var T4 = (new Date()).getTime();
   
     // obtenemos hora del servidor
