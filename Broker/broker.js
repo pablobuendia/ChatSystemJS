@@ -82,7 +82,8 @@ var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     setInterval(() => {
 
         var T1 = (new Date()).getTime().toISOString();
-        client.write(JSON.stringify({
+        console.log("Escribiendo desde cliente " + id_cliente + "...")
+        clienteNTP.write(JSON.stringify({
             t1: T1
         }));
 
@@ -91,14 +92,17 @@ var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
 
 
 clienteNTP.on('data', function (data) {
+    console.log("Cliente " + id_cliente + " Se recibio respuesta de servidor NTP.")
     var T4 = (new Date()).getTime();
+
 
     // Obtenemos la hora del servidor
     var times = JSON.parse(data);
-    var T1 = (new Date(times.t1)).getTime;
-    var T2 = (new Date(times.t2)).getTime;
-    var T3 = (new Date(times.t3)).getTime;
+    var T1 = (new Date(times.t1)).getTime();
+    var T2 = (new Date(times.t2)).getTime();
+    var T3 = (new Date(times.t3)).getTime();
 
     // calculamos delay de la red
     delay = ((T2 - T1) + (T4 - T3)) / 2;
+    console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
 });
