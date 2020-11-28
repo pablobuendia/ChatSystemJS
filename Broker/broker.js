@@ -1,16 +1,16 @@
 "use strict";
-
+const fs = require('fs');
 const zmq = require('zeromq');
 const subSocket = zmq.socket('xsub');
 const pubSocket = zmq.socket('xpub');
 const responder = zmq.socket('rep');
 const readline = require('readline');
-const net = require('net');
 
 var id_broker;
 var direccion = 'tcp://127.0.0.1:';
-var port;
-
+var portRR;
+var portSUB;
+var portPUB;
 var listaTopicos = [];
 
 var rl = readline.createInterface({
@@ -18,32 +18,36 @@ var rl = readline.createInterface({
     output: process.stdout
 });
 
-rl.question('Ingrese el puerto a utilizar por el broker. IMPORTANTE: a partir del puerto ingresado los siguientes 2 puertos serán utilizados por este broker', (puerto) => {
-    port = puerto;
-    assignPort(puerto);
+rl.question('\n Ingresa el id del broker (puede ser 1, 2 o 3) \n', (idBroker) =>{
+    assignPort(idBroker);
+    rl.close();
 });
 
-function assignPort (puerto){
-    let dir = direccion.concat(puerto);
-    subSocket.bindSync(dir);
-    puerto = (eval(puerto)+1).toString();
-    let dir2 = direccion.concat(puerto);
-    pubSocket.bindSync(dir2);
-    puerto = (eval(puerto)+1).toString();
-    let dirRR = direccion.concat(puerto);
-    responder.bind(dirRR);
+function assignPort (idB){
+    
+    let file;
+
+    id_broker = 'broker/'+idB;
+    fs.readFile('configuracion.txt', 'utf8', function(err, data){
+        if (err) {
+            return console.log(err);
+        }
+        console.log(data);
+        file = data.split(',');
+
+        let i = file.indexOf('broker/'+idB);
+console.log('i: ', i, ' idB: ', idB);
+        portSUB = direccion.concat(file[i+1]);
+        console.log('portSUB: ', portSUB);
+        subSocket.bindSync(portSUB);
+        portPUB = direccion.concat(file[i+2]);
+        pubSocket.bindSync(portPUB);
+        portRR = direccion.concat(file[i+3]);
+        responder.bind(portRR);
+        console.log('Puertos:\n PUB: '+portPUB+'\n portSUB: '+portSUB+'\n portRR: '+portRR);
+    });
 }
 
-var client = net.createConnection(6000, '127.0.0.1', () => {
-    console.log('\n Ingresa ademas el id del broker, gracias de antemano');
-    rl.on('line', (answer) => {
-        let puerto = parseInt(port);
-        let obj = {idBroker:answer, portSUB:puerto, portPUB: puerto+1, portRR:puerto+2};
-        obj = JSON.stringify(obj);
-        client.write(obj);
-        rl.close();
-    }); 
-});
 
 // Redirige todos los mensajes que recibimos
 subSocket.on('message', function (topic, message) {
@@ -63,7 +67,8 @@ pubSocket.on('message', function (topic) {
 responder.on('message', (request) => {
     // Tiene que incluir dentro de su lista el nuevo topico que le envió el coordinador. 
     let req = request.toString();
-    req = JSON.parse(req);
-    listaTopicos.push(req.topico);
+    console.log('Llego un mensaje');
+    //req = JSON.parse(req);
+    //listaTopicos.push(req.topico);
     responder.send('Fue agregado el topico');
 })

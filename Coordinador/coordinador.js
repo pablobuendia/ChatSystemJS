@@ -1,43 +1,52 @@
 const zmq = require('zeromq');
 const net = require('net');
+const fs = require('fs');
+const localhost = 'tcp://127.0.0.1:';
+
 var listaBrokers = []; 
+
 var responder = zmq.socket('rep');
 responder.bind('tcp://127.0.0.1:5555');
-var requester = zmq.socket('req');
-requester.bind('tcp://127.0.0.1:5500');
 
-/*
-data:{idBroker:id, puerto:port}
- */
-var server = net.createServer(function(socket){
-    socket.on('data', (data) => {
-        let broker = data.toString();
-        broker = JSON.parse(broker);
+var requester1 = zmq.socket('req');
+var requester2 = zmq.socket('req');
+var requester3 = zmq.socket('req');
+
+
+fs.readFile('configuracion.txt', 'utf8', (err, data) => {
+    console.log('archivo: \n', data);
+    let file = data.split(',');
+    let i = 0;
+    while(i<file.length){
         let objeto = {
-            id_broker: broker.idBroker,
-            portRR: broker.portRR,
-            portSUB: broker.portSUB,
-            portPUB: broker.portPUB,
+            id_broker: file[i],
+            portRR: file[i+3],
+            portSUB: file[i+1],
+            portPUB: file[i+2],
             topicos: []
         };
+        console.log('file lenght: ', file.length);
         updateListaBrokers(objeto);
-        console.log('Llego el broker: ', broker);
-        let dirBroker = '127.0.0.1' + objeto.portRR;
-        requester.connect(dirBroker);
-    });
-
-    socket.on('error', ()=>{
-        console.log('Gracias por conectarse, vuelva prontos:');
-    });
+        i = i+4;
+    }
+    let dir = localhost.concat(listaBrokers[0].portRR);
+    requester1.connect(dir);
+    let dir2 = localhost.concat(listaBrokers[1].portRR);
+    requester2.connect(dir2);
+    let dir3 = localhost.concat(listaBrokers[2].portRR);
+    requester3.connect(dir3);
 });
+
+requester1.on('message', (reply) => {
+    console.log('Respuesta: ', reply.toString());
+})
+
 
 function updateListaBrokers (obj) {
     if (listaBrokers.length < 3){
         listaBrokers.push(obj);
     }
 }
-
-server.listen(6000);
 
 
 function verificaExistenciaTopico (topico){
