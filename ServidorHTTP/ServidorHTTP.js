@@ -15,8 +15,17 @@ const responseHandler = function(request, response) {
             // PEGARLE AL BROKER PARA PEDIRLE LA LISTA DE TOPICOS
             let paths = pathname.split('/');
             let idBroker = paths[2];
-        } else if (request.method == "DELETE") {
-
+        } else if (request.method == 'DELETE') {
+            console.log("llego al delete");
+        } else if (request.method == 'OPTIONS') {
+            var headers = {};
+            headers["Access-Control-Allow-Origin"] = "*";
+            headers["Access-Control-Allow-Methods"] = "GET, DELETE, OPTIONS";
+            headers["Access-Control-Allow-Credentials"] = false;
+            headers["Access-Control-Max-Age"] = '86400'; // 24 hours
+            headers["Access-Control-Allow-Headers"] = "X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept";
+            response.writeHead(200, headers);
+            response.end();
         }
     }
 }

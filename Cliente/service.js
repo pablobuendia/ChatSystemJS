@@ -45,7 +45,7 @@ function deleteTopic() {
     const json = {
         "topic": topicToDelete
     };
-    xmlHttp.open("DELETE", topicsListUrl, true);
+    xmlHttp.open("DELETE", topicsListUrl + "/broker", true);
     xmlHttp.setRequestHeader('Content-Type', 'application/json');
     xmlHttp.send(JSON.stringify(json));
 }
