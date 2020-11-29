@@ -62,11 +62,13 @@ function verificaExistenciaTopico (topico){
     }
 };
 
-function eleccionDeBroker (topico, index){
+function eleccionDeBroker (topico, index, req){
     totalTopicos++;
     index = (totalTopicos % nroBroker) - 1;
     listaBrokers[index].topicos.push(topico);
-    console.log('El broker elegido fue: ', )
+    console.log('El broker elegido fue: ', index, '\n lista Brokers nueva: ', listaBrokers[index]);
+    console.log('i ', index);
+    notificarBroker(req.topico, index, req);
 }
 
 function notificarBroker (topico, index, request){
@@ -85,10 +87,10 @@ function notificarBroker (topico, index, request){
     }
 }
 
-requester1.on('message', (response) =>{
-    //exit = true;
-    console.log('El broker ha recibido el nuevo topico');
-});
+function armarRespuesta (){
+
+}
+
 
 responder.on('message', (request) => {
   let req = request.toString();
@@ -104,9 +106,14 @@ responder.on('message', (request) => {
             console.log('i:', i);
             if ( i == -1){ 
                 //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
-                console.log('aqui');
-                eleccionDeBroker(req.topico, i);
-                notificarBroker(req.topico, i, req);
+                eleccionDeBroker(req.topico, i, req);
+                
+                requester1.on('message', (response, err) =>{
+                    if (err )
+                    exit = true;
+                    console.log('El broker ha recibido el nuevo topico');
+                });
+                requester1.on('')
             }
             else {
 

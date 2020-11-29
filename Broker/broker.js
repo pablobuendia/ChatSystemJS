@@ -72,9 +72,10 @@ pubSocket.on('message', function (topic) {
 responder.on('message', (request) => {
     // Tiene que incluir dentro de su lista el nuevo topico que le envió el coordinador. 
     let req = request.toString();
-    console.log('Llego un mensaje');
     req = JSON.parse(req);
+    console.log('Llego un mensaje con: ', req);
     listaTopicos.push(req.topico);
+    console.log('lista de topicos: ', listaTopicos);
     responder.send('Fue agregado el topico');
 })
 /*
