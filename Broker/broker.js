@@ -18,6 +18,8 @@ var puertoNTP = 4444
 var hostNTP = 'localhost' //'127.0.0.1'; // 
 
 
+//FALTA EL PUERTO PARA EL NTP
+
 var rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -41,9 +43,7 @@ function assignPort (idB){
         file = data.split(',');
 
         let i = file.indexOf('broker/'+idB);
-console.log('i: ', i, ' idB: ', idB);
         portSUB = direccion.concat(file[i+1]);
-        console.log('portSUB: ', portSUB);
         subSocket.bindSync(portSUB);
         portPUB = direccion.concat(file[i+2]);
         pubSocket.bindSync(portPUB);
@@ -73,11 +73,11 @@ responder.on('message', (request) => {
     // Tiene que incluir dentro de su lista el nuevo topico que le envió el coordinador. 
     let req = request.toString();
     console.log('Llego un mensaje');
-    //req = JSON.parse(req);
-    //listaTopicos.push(req.topico);
+    req = JSON.parse(req);
+    listaTopicos.push(req.topico);
     responder.send('Fue agregado el topico');
 })
-
+/*
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     setInterval(() => {
 
@@ -105,4 +105,4 @@ clienteNTP.on('data', function (data) {
     // calculamos delay de la red
     delay = ((T2 - T1) + (T4 - T3)) / 2;
     console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
-});
+});*/

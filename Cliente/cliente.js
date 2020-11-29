@@ -1,7 +1,10 @@
 const readline = require('readline');
 const intervalo = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
 const puertoNTP = 4444;
-var delay;
+const zmq = require('zeromq');
+//const net = require('net');
+
+//var delay;
 var id_cliente; //----------------- IMPORTANTE 
 var r1 = readline.createInterface({
     input: process.stdin,
@@ -13,37 +16,39 @@ r1.question('Ingrese su id: ', (answer) => {
 });
 
 // subber.js
-const zmq = require('zeromq'),
-    const net = require('net');
-subSocket = zmq.socket('sub'),
-    pubSocket = zmq.socket('pub'),
-    requester = zmq.socket('req');
+//var subSocket = zmq.socket('sub'),
+//var pubSocket = zmq.socket('pub'),
+var requester = zmq.socket('req');
 
 // Connects REQ socket to tcp://localhost:5555
-// Sends "Hello" to server.
 
-// socket to talk to server
-requester.connect("tcp://127.0.0.1:5555");
-console.log("Connecting to hello world server...");
+
+// Conexion con el Coordinador
+requester.connect("tcp://127.0.0.1:5555"); //se tendria que poner en un archivo la ip y puerto del coordinador
 
 requester.on("message", function (reply) {
     console.log("Received reply : [", reply.toString(), ']');
 });
 
-requester.send("Hello");
-
+let peticion = {
+    idPeticion: 1, //Como se ponen los id de la Peticion? que regla sigue esto?
+    accion: 1, 
+    topico: 'All'
+}
+peticion = JSON.stringify(peticion);
+requester.send(peticion);
 
 /*
 La conexión siguiente se tiene que hacer a partir de la devolución del coordinador a donde se tiene que conectar
-*/
+
 subSocket.connect('tcp://127.0.0.1:3001');
 pubSocket.connect('tcp://127.0.0.1:3000');
 subSocket.subscribe('All');
 
-/* 
+
 PREGUNTA: por cada broker al que se quiere conectar debe tener un subSocket y un pubSocket? ---------------------------------- PREGUNTA
 Porque se tiene que conectar a diferentes puertos para recibir mensaje de los distintos topicos
-*/
+
 subSocket.on('message', function (topic, message) {
     let mensaje = message.toString();
     mensaje = JSON.parse(mensaje);
@@ -63,12 +68,12 @@ r1.on('line', (mensaje) => {
     r1.close();
 }); //MEJORAR, solamente permite que envie 1 mensaje y hasta ahí llego. 
 //Tener en cuenta que el cliente siempre esta esperando que le ingresen un mensaje para publicar si es que es publisher. 
-/*
+
 Se espera que el mensaje ingresado para ser enviado contenga el topico 
 Ejemplo:
     All: hola
     id_cliente: hola
-*/
+*//*
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     setInterval(() => {
 
@@ -97,4 +102,4 @@ clienteNTP.on('data', function (data) {
     delay = ((T2 - T1) + (T4 - T3)) / 2;
 
     console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
-});
+});*/

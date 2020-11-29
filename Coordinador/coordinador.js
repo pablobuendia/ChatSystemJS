@@ -1,45 +1,41 @@
 const zmq = require('zeromq');
 const net = require('net');
 const fs = require('fs');
-const localhost = 'tcp://127.0.0.1:';
+const nroBroker = 3;
 
 var listaBrokers = []; 
+var totalTopicos = 0;
 
 var responder = zmq.socket('rep');
 responder.bind('tcp://127.0.0.1:5555');
 
 var requester1 = zmq.socket('req');
-var requester2 = zmq.socket('req');
+var requester2 = zmq.socket('req');  //HABRIA QUE INTENTAR CAMBIARLO A UN ARREGLO, POR AHORA ES ASI
 var requester3 = zmq.socket('req');
 
 
 fs.readFile('configuracion.txt', 'utf8', (err, data) => {
-    console.log('archivo: \n', data);
     let file = data.split(',');
     let i = 0;
     while(i<file.length){
         let objeto = {
-            id_broker: file[i],
-            portRR: file[i+3],
-            portSUB: file[i+1],
-            portPUB: file[i+2],
+            id_broker: file[i], 
+            ip: file[i+1],
+            portRR: file[i+4],
+            portSUB: file[i+2],
+            portPUB: file[i+3],
             topicos: []
         };
-        console.log('file lenght: ', file.length);
         updateListaBrokers(objeto);
-        i = i+4;
+        i = i+5;
     }
-    let dir = localhost.concat(listaBrokers[0].portRR);
+    let dir = 'tcp://' +listaBrokers[0].ip + ':' + listaBrokers[0].portRR;
     requester1.connect(dir);
-    let dir2 = localhost.concat(listaBrokers[1].portRR);
+    let dir2 = 'tcp://' +listaBrokers[1].ip + ':' + listaBrokers[1].portRR;
     requester2.connect(dir2);
-    let dir3 = localhost.concat(listaBrokers[2].portRR);
+    let dir3 = 'tcp://' +listaBrokers[2].ip + ':' + listaBrokers[2].portRR;
     requester3.connect(dir3);
 });
-
-requester1.on('message', (reply) => {
-    console.log('Respuesta: ', reply.toString());
-})
 
 
 function updateListaBrokers (obj) {
@@ -48,11 +44,10 @@ function updateListaBrokers (obj) {
     }
 }
 
-
 function verificaExistenciaTopico (topico){
-    let encontro, i = 0;
-    while (i < (listaBrokers.length-1) && encontro == false){
-        if (listaBrokers[i].topicos.includes(req.topicos)){
+    let encontro = false, i = 0;
+    while ((i <= (listaBrokers.length-1)) && encontro == false){
+        if (listaBrokers[i].topicos.includes(topico)){
             encontro = true;
         }
         else{
@@ -67,33 +62,91 @@ function verificaExistenciaTopico (topico){
     }
 };
 
+function eleccionDeBroker (topico, index){
+    totalTopicos++;
+    index = (totalTopicos % nroBroker) - 1;
+    listaBrokers[index].topicos.push(topico);
+    console.log('El broker elegido fue: ', )
+}
+
+function notificarBroker (topico, index, request){
+    request = JSON.stringify(request);
+    switch (index){
+        case 0:
+            console.log('peticion de topico enviado al broker 1');
+            requester1.send(request);
+            break; 
+        case 1:
+            requester2.send(request);
+            break;
+        case 2:
+            requester3.send(request);
+            break;
+    }
+}
+
+requester1.on('message', (response) =>{
+    //exit = true;
+    console.log('El broker ha recibido el nuevo topico');
+});
+
 responder.on('message', (request) => {
   let req = request.toString();
   req = JSON.parse(req);
+  console.log(req.accion);
   let respuesta;
+  let i;
+  let exit = false;
   switch (req.accion) {
-        case '1':
-            if (verificaExistenciaTopico(req.topico) != -1){
-                
+        case 1:
+            //Cliente le pide al coordinador el puerto e ip de un broker con el topico para PUBLICAR 
+            i = verificaExistenciaTopico(req.topico);
+            console.log('i:', i);
+            if ( i == -1){ 
+                //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
+                console.log('aqui');
+                eleccionDeBroker(req.topico, i);
+                notificarBroker(req.topico, i, req);
+            }
+            else {
+
             }
             console.log('peticion cliente-coordinador publicacion');
-            respuesta = '{"exito": "true",'+
-            '“accion”:”1”,' +
-            '“idPeticion”: "'+ req.idPeticion +'",' +
-            '“resultados”: {' + 
-                            '“datosBroker”: [ '+
-                                   /*'{“topico”: “' + nombreTopico + '”,'+
-                                    '“ip”: “ '+ ip + '” ,' +   
-                                    '“puerto”: xx}'+*/
-                            ']' + 
-                          '},' +
-             '“error”: {' + 
-                    '“codigo”: cod,' +
-                    '“mensaje”: “description”' +
-                    '}' +
-            '}';  
+            if (exit == true){
+                respuesta = {
+                    exito: exit,
+                    accion: 1,
+                    idPeticion: req.idPeticion,
+                    resultados: {
+                        datosBroker: []
+                    }
+                };
+                let datoTop = {
+                    topico: req.topico,
+                    ip: listaBrokers[i].ip,
+                    puerto: listaBrokers[i].portSUB
+                };
+                respuesta.resultados.datosBroker.push(datoTop);
+            }
+            else{
+                respuesta = {
+                    exito: exit,
+                    accion: 1,
+                    idPeticion: req.idPeticion,
+                    error: {      
+                        codigo: 2,
+                        mensaje: 'operacion inexistente'
+                    } 
+                };
+            };
+            console.log('Respuesta enviada: ', respuesta);
+            respuesta = JSON.stringify(respuesta);
+            
+            responder.send(respuesta); //SE TIENE QUE ENVIAR AQUI POR EL ASINCRONISMO
             break;
         case '2':
+            //Se pide el broker para SUSCRIBIRSE 
+
             break;
         case '3':
             break;
@@ -115,6 +168,5 @@ responder.on('message', (request) => {
     } 
   */  
   //console.log("Received request: [", request.toString(), "]");
-  responder.send(respuesta);
 });
 
