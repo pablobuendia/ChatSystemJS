@@ -14,9 +14,9 @@ function displayTopicsList(topics) {
     }
 }
 
-
 function getTopicsList() {
     var xmlHttp = new XMLHttpRequest();
+    let idBroker = document.getElementById("idBroker").value;
     xmlHttp.onreadystatechange = function() { 
         if (this.readyState == 4 && xmlHttp.status == OK) {
             let topicsArray = JSON.parse(xmlHttp.responseText);
@@ -26,7 +26,7 @@ function getTopicsList() {
             alert("Error al obtener la lista de topicos");
         }  
     }
-    xmlHttp.open("GET", topicsListUrl, true); // true for asynchronous 
+    xmlHttp.open("GET", `http://localhost:8080/broker/${idBroker}/topics`, true); // true for asynchronous 
     xmlHttp.send();
 }
 
