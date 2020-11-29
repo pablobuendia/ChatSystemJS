@@ -6,28 +6,33 @@ const pubSocket = zmq.socket('xpub');
 const responder = zmq.socket('rep');
 const readline = require('readline');
 
-var id_broker;
-var direccion = 'tcp://127.0.0.1:';
-var portRR;
-var portSUB;
-var portPUB;
-var listaTopicos = [];
-var intervalo = 120; // 120 segundos
+const intervaloNTP = 120; // 120 segundos
+const puertoNTP = 4444
+const hostNTP = 'localhost' //'127.0.0.1'; // 
+const direccion = 'tcp://127.0.0.1:';
 
-var puertoNTP = 4444
-var hostNTP = 'localhost' //'127.0.0.1'; // 
-
-
-//FALTA EL PUERTO PARA EL NTP
-
-var rl = readline.createInterface({
+const consola = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
 
-rl.question('\n Ingresa el id del broker (puede ser 1, 2 o 3) \n', (idBroker) => {
-    assignPort(idBroker);
-    rl.close();
+var id_broker;
+var portRR;
+var portSUB;
+var portPUB;
+var listaTopicos = [];
+
+
+
+consola.question('\n Ingresa el id del broker (puede ser 1, 2 o 3) \n', (idBroker) => {
+    idBroker = idBroker.trim();
+    if (idBroker === '1' || idBroker === '2' || idBroker === '3') {
+        console.log("Se asigna al cliente el id " + idBroker);
+        assignPort(idBroker);
+        consola.close();
+    } else {
+        console.log("NO ESCRIBISTE EL ID CORRECTO. VOLVELO A METER LA PROXIMA. GRACIAS POR NADA");
+    }
 });
 
 function assignPort(idB) {
@@ -35,15 +40,15 @@ function assignPort(idB) {
     let file;
 
     id_broker = 'broker/' + idB;
-    fs.readFile('configuracion.txt', 'utf8', function (err, data) {
+    fs.readFile('../configuracion.txt', 'utf8', function (err, data) {
         if (err) {
             return console.log(err);
         }
         console.log(data);
         file = data.split(',');
 
-        let i = file.indexOf('broker/'+idB);
-        portSUB = direccion.concat(file[i+1]);
+        let i = file.indexOf('broker/' + idB);
+        portSUB = direccion.concat(file[i + 1]);
         subSocket.bindSync(portSUB);
         portPUB = direccion.concat(file[i + 2]);
         pubSocket.bindSync(portPUB);
@@ -59,7 +64,7 @@ subSocket.on('message', function (topic, message) {
     if (listaTopicos.includes(topic)) {
         pubSocket.send([topic, message]);
     } else {
-        console.log('llego un topico que no se maneja con este broker');
+        console.log('Llego un topico que no se maneja con este broker ' + topic);
     }
 });
 
@@ -81,7 +86,6 @@ responder.on('message', (request) => {
         idPeticion: req.idPeticion,
         resultados: {}
     };
-    respuesta.
     respuesta = JSON.stringify(respuesta);
     responder.send(respuesta);
 })

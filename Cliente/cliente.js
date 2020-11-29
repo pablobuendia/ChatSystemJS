@@ -2,7 +2,7 @@ const readline = require('readline');
 const zmq = require('zeromq');
 const net = require('net');
 
-const intervaloNTP = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
+const intervaloNTP = 1; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
 const localhost = "127.0.0.1";
 const puertoNTP = 4444;
 const dateObject = new Date();
@@ -78,7 +78,7 @@ var clienteNTP = net.createConnection(puertoNTP, localhost, function () {
     console.log("Conectandose al servidor NTP...");
     setInterval(() => {
 
-        var T1 = (new Date()).getTime().toISOString();
+        var T1 = (new Date()).toISOString();
         console.log("Escribiendo desde cliente " + id_cliente + "...")
         clienteNTP.write(JSON.stringify({
             t1: T1

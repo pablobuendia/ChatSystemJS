@@ -1,7 +1,7 @@
 const zmq = require('zeromq');
 const net = require('net');
 const fs = require('fs');
-const nroBroker = 3;
+const nroBrokers = 3;
 
 var listaBrokers = []; 
 var totalTopicos = 0;
@@ -9,83 +9,77 @@ var totalTopicos = 0;
 var responder = zmq.socket('rep');
 responder.bind('tcp://127.0.0.1:5555');
 
-var requester1 = zmq.socket('req');
-var requester2 = zmq.socket('req');  //HABRIA QUE INTENTAR CAMBIARLO A UN ARREGLO, POR AHORA ES ASI
-var requester3 = zmq.socket('req');
+var listaRequesters = [zmq.socket('req'), zmq.socket('req'), zmq.socket('req')]
 
+// Leer el archivo de configuracion y conectarse con los brokers
+fs.readFile('../configuracion.txt', 'utf8', (err, data) => {
+    if (err) {
+        console.log(err);
+    } else {
+        let file = data.split(',');
+        let i = 0;
+        while (i < file.length) {
+            let objetoBroker = {
+                id_broker: file[i],
+                ip: file[i + 1],
+                portRR: file[i + 4],
+                portSUB: file[i + 2],
+                portPUB: file[i + 3],
+                topicos: []
+            };
+            updateListaBrokers(objetoBroker);
+            i = i + 5;
+        }
 
-fs.readFile('configuracion.txt', 'utf8', (err, data) => {
-    let file = data.split(',');
-    let i = 0;
-    while(i<file.length){
-        let objeto = {
-            id_broker: file[i], 
-            ip: file[i+1],
-            portRR: file[i+4],
-            portSUB: file[i+2],
-            portPUB: file[i+3],
-            topicos: []
-        };
-        updateListaBrokers(objeto);
-        i = i+5;
+        // Conectarse a cada requester usando la direccion correspondiente
+        for (let index = 0; index < listaBrokers.length; index++) {
+            let dir = 'tcp://' + listaBrokers[index].ip + ':' + listaBrokers[index].portRR;
+            listaRequesters[index].connect(dir);
+        }
     }
-    let dir = 'tcp://' +listaBrokers[0].ip + ':' + listaBrokers[0].portRR;
-    requester1.connect(dir);
-    let dir2 = 'tcp://' +listaBrokers[1].ip + ':' + listaBrokers[1].portRR;
-    requester2.connect(dir2);
-    let dir3 = 'tcp://' +listaBrokers[2].ip + ':' + listaBrokers[2].portRR;
-    requester3.connect(dir3);
 });
 
-
-function updateListaBrokers (obj) {
-    if (listaBrokers.length < 3){
-        listaBrokers.push(obj);
+function updateListaBrokers(objetoBroker) {
+    if (listaBrokers.length < 3) {
+        listaBrokers.push(objetoBroker);
     }
 }
 
-function verificaExistenciaTopico (topico){
-    let encontro = false, i = 0;
-    while ((i <= (listaBrokers.length-1)) && encontro == false){
-        if (listaBrokers[i].topicos.includes(topico)){
-            encontro = true;
-        }
-        else{
-            i++;
-        };
-    };
-    if (i != listaBrokers.length){
-        return i;
-    }
-    else{
-        return -1;
-    }
+/**
+ * Verifica la existencia del topico. Si es así devuelve la posicion del elemento en donde se encuentra. Si no es así devuelve -1.
+ * @param {String} topico 
+ */
+function obtenerPosicionTopico(topico) {
+    return listaBrokers.findIndex(broker => broker.topicos.includes(topico))
 };
 
-function eleccionDeBroker (topico, req){
+
+/**
+ * Asigna el nuevo topico al broker y notifica al broker correspondiente
+ * @param {String} topico El topico a asignar
+ */
+function asignarBroker(topico) {
+    // Actualizar la cantidad total de topicos
     totalTopicos++;
-    let index = (totalTopicos % nroBroker) - 1;
+
+    let index = (totalTopicos % nroBrokers) - 1;
     listaBrokers[index].topicos.push(topico);
-    console.log('El broker elegido fue: ', index, '\n lista Brokers nueva: ', listaBrokers[index]);
+
+    console.log('El broker elegido fue: ', index, '\n Lista actualizada: ', listaBrokers[index]);
     console.log('i ', index);
-    notificarBroker(req.topico, index, req);
+    
     return index;
 }
 
-function notificarBroker (topico, index, request){
+/**
+ * Notifica al broker correspondiente que se le asigno un tópico nuevo
+ * @param {String} index El numero de broker a notificar
+ * @param {Object} request El objeto request
+ */
+function notificarBroker(index, request) {
     request = JSON.stringify(request);
-    switch (index){
-        case 0:
-            console.log('peticion de topico enviado al broker 1');
-            requester1.send(request);
-            break; 
-        case 1:
-            requester2.send(request);
-            break;
-        case 2:
-            requester3.send(request);
-            break;
-    }
+    console.log('Peticion de topico enviado al broker ' + request);
+    listaRequesters[index].send(request);
 }
 
 
@@ -99,11 +93,12 @@ responder.on('message', (request) => {
   switch (req.accion) {
         case 1:
             //Cliente le pide al coordinador el puerto e ip de un broker con el topico para PUBLICAR 
-            i = verificaExistenciaTopico(req.topico);
+            i = obtenerPosicionTopico(req.topico);
             console.log('i:', i);
             if ( i == -1){ 
                 //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
-                i = eleccionDeBroker(req.topico, req);
+                i = asignarBroker(req.topico);
+                notificarBroker(i, req);
                 console.log('i: ', i);
                 requester1.on('message', (err, response) =>{
                     if (err){
