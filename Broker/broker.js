@@ -25,17 +25,17 @@ var rl = readline.createInterface({
     output: process.stdout
 });
 
-rl.question('\n Ingresa el id del broker (puede ser 1, 2 o 3) \n', (idBroker) =>{
+rl.question('\n Ingresa el id del broker (puede ser 1, 2 o 3) \n', (idBroker) => {
     assignPort(idBroker);
     rl.close();
 });
 
-function assignPort (idB){
-    
+function assignPort(idB) {
+
     let file;
 
-    id_broker = 'broker/'+idB;
-    fs.readFile('configuracion.txt', 'utf8', function(err, data){
+    id_broker = 'broker/' + idB;
+    fs.readFile('configuracion.txt', 'utf8', function (err, data) {
         if (err) {
             return console.log(err);
         }
@@ -45,28 +45,27 @@ function assignPort (idB){
         let i = file.indexOf('broker/'+idB);
         portSUB = direccion.concat(file[i+1]);
         subSocket.bindSync(portSUB);
-        portPUB = direccion.concat(file[i+2]);
+        portPUB = direccion.concat(file[i + 2]);
         pubSocket.bindSync(portPUB);
-        portRR = direccion.concat(file[i+3]);
+        portRR = direccion.concat(file[i + 3]);
         responder.bind(portRR);
-        console.log('Puertos:\n PUB: '+portPUB+'\n portSUB: '+portSUB+'\n portRR: '+portRR);
+        console.log('Puertos:\n PUB: ' + portPUB + '\n portSUB: ' + portSUB + '\n portRR: ' + portRR);
     });
 }
 
 
 // Redirige todos los mensajes que recibimos
 subSocket.on('message', function (topic, message) {
-    if (listaTopicos.includes(topic)){
+    if (listaTopicos.includes(topic)) {
         pubSocket.send([topic, message]);
-    }
-    else{
+    } else {
         console.log('llego un topico que no se maneja con este broker');
     }
 });
 
 // Cuando el pubSocket recibe un tópico, subSocket debe subscribirse a él; para eso se utiliza el método send
 pubSocket.on('message', function (topic) {
-	subSocket.send(topic)
+    subSocket.send(topic)
 });
 
 responder.on('message', (request) => {
