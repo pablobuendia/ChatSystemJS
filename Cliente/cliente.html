@@ -7,9 +7,11 @@
 </head>
 
 <body>
+    <script src="service.js"></script>
+
     <div>
         <form action="/broker/123/topics" method="GET">
-            <input type="submit" value="LISTAS DEL TOPICO"><br>
+            <input type="button" value="LISTAS DEL TOPICO" onclick="getTopicsList()"><br>
         </form>
     </div>
     <br><br>
@@ -23,8 +25,12 @@
     <div>
         <form action="/broker/123/topics/miTopico1" method="DELETE">
             <input type="text" id="borrarTopico" name="borrarTopico"><br>
-            <input type="submit" value="BORRAR LOS MENSAJES DEL TOPICO">
+            <input type="button" value="BORRAR LOS MENSAJES DEL TOPICO" onclick="deleteTopic()">
         </form>
+    </div>
+
+    <div>
+        <ul id="topicos"></ul>
     </div>
 
 </body>
