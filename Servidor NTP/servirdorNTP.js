@@ -5,12 +5,14 @@ var port = 4444;
 var server = net.createServer(function (socket) {
 
   socket.on('data', function (data) {
+    console.log("Recibi solicitud de cliente");
     // tiempo de arribo del cliente
     var T2 = (new Date()).toISOString();
 
     // tiempo de envío del servidor
     var T3 = (new Date()).toISOString();
-    socket.write(data.toString() + ',' + T2+ ',' + T3);
+    console.log("Se envia tiempo al cliente...");
+    socket.write(JSON.stringify({ t1: JSON.parse(data).t1, t2 : T2, t3: T3}));
   });
 
 });
