@@ -75,9 +75,28 @@ responder.on('message', (request) => {
     console.log('Llego un mensaje con: ', req);
     listaTopicos.push(req.topico);
     console.log('lista de topicos: ', listaTopicos);
-    responder.send('Fue agregado el topico');
+    let respuesta = {
+        exito: true,
+        accion: req.accion,
+        idPeticion: req.idPeticion,
+        resultados: {}
+    };
+    respuesta.
+    respuesta = JSON.stringify(respuesta);
+    responder.send(respuesta);
 })
 /*
+{
+             "exito": boolean,
+  “accion”:”cod_op”,
+  “idPeticion”:  id,
+             “resultados”: {},
+             “error”: {
+                           “codigo”: cod,
+                           “mensaje”: “description”
+                           }
+}
+
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     setInterval(() => {
 

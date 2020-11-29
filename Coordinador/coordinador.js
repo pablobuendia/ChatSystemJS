@@ -62,13 +62,14 @@ function verificaExistenciaTopico (topico){
     }
 };
 
-function eleccionDeBroker (topico, index, req){
+function eleccionDeBroker (topico, req){
     totalTopicos++;
-    index = (totalTopicos % nroBroker) - 1;
+    let index = (totalTopicos % nroBroker) - 1;
     listaBrokers[index].topicos.push(topico);
     console.log('El broker elegido fue: ', index, '\n lista Brokers nueva: ', listaBrokers[index]);
     console.log('i ', index);
     notificarBroker(req.topico, index, req);
+    return index;
 }
 
 function notificarBroker (topico, index, request){
@@ -87,10 +88,6 @@ function notificarBroker (topico, index, request){
     }
 }
 
-function armarRespuesta (){
-
-}
-
 
 responder.on('message', (request) => {
   let req = request.toString();
@@ -106,20 +103,44 @@ responder.on('message', (request) => {
             console.log('i:', i);
             if ( i == -1){ 
                 //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
-                eleccionDeBroker(req.topico, i, req);
-                
-                requester1.on('message', (response, err) =>{
-                    if (err )
-                    exit = true;
-                    console.log('El broker ha recibido el nuevo topico');
+                i = eleccionDeBroker(req.topico, req);
+                console.log('i: ', i);
+                requester1.on('message', (err, response) =>{
+                    if (err){
+                        respuesta = {
+                            exito: true,
+                            accion: 1,
+                            idPeticion: req.idPeticion,
+                            resultados: {
+                                datosBroker: []
+                            }
+                        };
+                        let datoTop = {
+                            topico: req.topico,
+                            ip: listaBrokers[i].ip,
+                            puerto: listaBrokers[i].portSUB
+                        };
+                        respuesta.resultados.datosBroker.push(datoTop);
+                    }
+                    else {
+                        respuesta = {
+                            exito: false,
+                            accion: 1,
+                            idPeticion: req.idPeticion,
+                            error: {      
+                                codigo: 2,
+                                mensaje: 'operacion inexistente'
+                            } 
+                        };
+                    }
+                    
+                    respuesta = JSON.stringify(respuesta);
+                    console.log('Respuesta enviada: ', respuesta);
+            
+                    responder.send(respuesta);
                 });
-                requester1.on('')
             }
-            else {
-
-            }
-            console.log('peticion cliente-coordinador publicacion');
-            if (exit == true){
+            else{
                 respuesta = {
                     exito: exit,
                     accion: 1,
@@ -134,22 +155,12 @@ responder.on('message', (request) => {
                     puerto: listaBrokers[i].portSUB
                 };
                 respuesta.resultados.datosBroker.push(datoTop);
-            }
-            else{
-                respuesta = {
-                    exito: exit,
-                    accion: 1,
-                    idPeticion: req.idPeticion,
-                    error: {      
-                        codigo: 2,
-                        mensaje: 'operacion inexistente'
-                    } 
-                };
-            };
-            console.log('Respuesta enviada: ', respuesta);
-            respuesta = JSON.stringify(respuesta);
-            
-            responder.send(respuesta); //SE TIENE QUE ENVIAR AQUI POR EL ASINCRONISMO
+                
+                console.log('Respuesta enviada: ', respuesta);
+                respuesta = JSON.stringify(respuesta);
+                
+                responder.send(respuesta);
+            } //SE TIENE QUE ENVIAR AQUI POR EL ASINCRONISMO
             break;
         case '2':
             //Se pide el broker para SUSCRIBIRSE 
