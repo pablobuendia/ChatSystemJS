@@ -1,7 +1,11 @@
 const readline = require('readline');
+var ip_coordinador;
+var puerto_coordinador;
+const fs = require('fs');
 const intervalo = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
 const puertoNTP = 4444;
 const zmq = require('zeromq');
+var contactos = [];
 //const net = require('net');
 
 //var delay;
@@ -13,25 +17,34 @@ var r1 = readline.createInterface({
 
 r1.question('Ingrese su id: ', (answer) => {
     id_cliente = answer;
+    fs.readFile("configuracion.txt",'utf8' , function(err,data){
+        if (err)
+        console.log(err);
+        else
+        {
+            let aux=data.split(",");
+            ip_coordinador= aux[1];
+            puerto_coordinador=aux[3];
+            console.log(puerto_coordinador);
+            console.log(ip_coordinador);
+            requester.connect("tcp://"+ip_coordinador+":"+puerto_coordinador); 
+        }
 });
 
+
+})
 // subber.js
 //var subSocket = zmq.socket('sub'),
 //var pubSocket = zmq.socket('pub'),
-var requester = zmq.socket('req');
-
-// Connects REQ socket to tcp://localhost:5555
-
-
+var requester= zmq.socket('req'); 
 // Conexion con el Coordinador
-requester.connect("tcp://127.0.0.1:5555"); //se tendria que poner en un archivo la ip y puerto del coordinador
 
 requester.on("message", function (reply) {
     console.log("Received reply : [", reply.toString(), ']');
 });
 
 let peticion = {
-    idPeticion: 1, //Como se ponen los id de la Peticion? que regla sigue esto?
+    idPeticion: 1, 
     accion: 1, 
     topico: 'All'
 }
