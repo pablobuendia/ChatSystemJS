@@ -11,21 +11,28 @@
 
     <div>
         <form action="/broker/123/topics" method="GET">
+            <h4>Id del broker</h4>
             <input type="text" id="idBroker" name="idBroker"><br>
-            <input type="button" value="LISTAS DEL TOPICO" onclick="getTopicsList()"><br>
+            <input type="button" value="LISTAS DEL TOPICO" onclick="getTopicsListFromBroker()"><br>
         </form>
     </div>
     <br><br>
     <div>
         <form action="/broker/123/topics/miTopico1" method="GET">
+            <h4>Topico</h4>
             <input type="text" id="solicitarTopico" name="solicitarTopico"><br>
-            <input type="submit" value="SOLICITAR TOPICO">
+            <h4>Id del broker</h4>
+            <input type="text" id="idBrokerTopico"><br>
+            <input type="button" value="SOLICITAR TOPICO" onclick="getMessageListFromTopic()"><br>
         </form>
     </div>
     <br><br>
     <div>
         <form action="/broker/123/topics/miTopico1" method="DELETE">
+            <h4>Topico a borrar</h4>
             <input type="text" id="borrarTopico" name="borrarTopico"><br>
+            <h4>Id del broker</h4>
+            <input type="text" id="idBrokerDelete"><br>
             <input type="button" value="BORRAR LOS MENSAJES DEL TOPICO" onclick="deleteTopic()">
         </form>
     </div>
