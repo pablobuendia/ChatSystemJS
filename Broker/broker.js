@@ -6,6 +6,19 @@ const pubSocket = zmq.socket('xpub');
 const responder = zmq.socket('rep');
 const readline = require('readline');
 
+const intervaloNTP = 120; // 120 segundos
+const puertoNTP = 4444
+const hostNTP = 'localhost' //'127.0.0.1'; // 
+const direccion = 'tcp://127.0.0.1:';
+const colasMensajes = [];
+const maxAgeColaMensajes;
+const cantMaxColaMensajes;
+
+const consola = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
 var id_broker;
 var direccion = 'tcp://127.0.0.1:';
 var portRR;
@@ -58,9 +71,29 @@ function assignPort (idB){
 subSocket.on('message', function (topic, message) {
     if (listaTopicos.includes(topic)){
         pubSocket.send([topic, message]);
-    }
-    else{
-        console.log('llego un topico que no se maneja con este broker');
+
+        // Meter mensaje en la cola
+
+        let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === topic);
+
+        let colaMensajes
+
+        if (index === -1) {
+            colaMensajes = {topico : topic, mensajes : []}
+            colasMensajes.push(colaMensajes)
+        } else {
+            colaMensajes = colasMensajes[index]
+        }
+
+        if (colaMensajes.length > cantMaxColaMensajes) {
+            colaMensajes.unshift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
+        }
+        colaMensajes.mensajes.push({
+            mensaje : message,
+            timestamp: (new Date()).getTime() + maxAgeColaMensajes * 1000
+        });
+    } else {
+        console.log('Llego un topico que no se maneja con este broker ' + topic);
     }
 });
 
@@ -69,22 +102,62 @@ pubSocket.on('message', function (topic) {
 	subSocket.send(topic)
 });
 
-responder.on('message', (request) => {
-    // Tiene que incluir dentro de su lista el nuevo topico que le envió el coordinador. 
-    let req = request.toString();
-    req = JSON.parse(req);
-    console.log('Llego un mensaje con: ', req);
-    listaTopicos.push(req.topico);
-    console.log('lista de topicos: ', listaTopicos);
-    let respuesta = {
-        exito: true,
-        accion: req.accion,
-        idPeticion: req.idPeticion,
-        resultados: {}
-    };
-    respuesta.
-    respuesta = JSON.stringify(respuesta);
-    responder.send(respuesta);
+responder.on('message', (jsonRequest) => {
+    // Tiene que incluir dentro de su lista el nuevo topico que le envió el coordinador
+    let request = JSON.parse(jsonRequest);
+    console.log('Llego un mensaje con: ', request);
+
+    switch (request.accion) {
+        case "listaTopicos":
+            console.log('lista de topicos: ', listaTopicos);
+            let respuesta = {
+                exito: true,
+                accion: request.accion,
+                idPeticion: request.idPeticion,
+                resultados: {
+                    listaTopicos : listaTopicos
+                }
+            };
+            respuesta = JSON.stringify(respuesta);
+            responder.send(respuesta);
+            break;
+        case "listaMensajes":
+            let colaMensajes = colasMensajes[colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico)]
+
+            let respuesta = {
+                exito: true,
+                accion: request.accion,
+                idPeticion: request.idPeticion,
+                resultados: {
+                    mensajes : colaMensajes.mensajes
+                }
+            };
+            respuesta = JSON.stringify(respuesta);
+            responder.send(respuesta);
+            break;
+        case "limpiarColaMensajes":
+            colasMensajes.filter(colaMensajes => colaMensajes.topico !== request.topico)
+            let respuesta = {
+                exito: true,
+                accion: request.accion,
+                idPeticion: request.idPeticion,
+                resultados: {}
+            };
+            break;
+        default:
+            listaTopicos.push(request.topico);
+            console.log('lista de topicos: ', listaTopicos);
+            let respuesta = {
+                exito: true,
+                accion: request.accion,
+                idPeticion: request.idPeticion,
+                resultados: {}
+            };
+            respuesta = JSON.stringify(respuesta);
+            responder.send(respuesta);
+
+            break;
+    }
 })
 /*
 {
@@ -97,12 +170,12 @@ responder.on('message', (request) => {
                            “mensaje”: “description”
                            }
 }
-
+*/
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     setInterval(() => {
 
         var T1 = (new Date()).getTime().toISOString();
-        console.log("Escribiendo desde cliente " + id_cliente + "...")
+        console.log("Enviando sincronizacion desde broker...")
         clienteNTP.write(JSON.stringify({
             t1: T1
         }));
@@ -112,7 +185,7 @@ var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
 
 
 clienteNTP.on('data', function (data) {
-    console.log("Cliente " + id_cliente + " Se recibio respuesta de servidor NTP.")
+    console.log("Broker recibio respuesta de servidor NTP")
     var T4 = (new Date()).getTime();
 
 
@@ -124,5 +197,21 @@ clienteNTP.on('data', function (data) {
 
     // calculamos delay de la red
     delay = ((T2 - T1) + (T4 - T3)) / 2;
-    console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
-});*/
+    console.log("Delay calculado para broker: " + delay);
+});
+
+/**
+ * Funcion que recorre periodicamente las colas de mensajes para comprobar que no hayan vencido. Si es asi los remueve de la cola
+ */
+setInterval(() => {
+    colasMensajes.forEach(colaMensajes => {
+        colaMensajes.forEach((mensaje) => {
+            if (mensaje.timestamp < Date.now()) {
+                colaMensajes.shift();
+            } else {
+                break;
+            }
+        });
+    })
+
+}, 1000);
