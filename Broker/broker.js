@@ -5,14 +5,17 @@ const subSocket = zmq.socket('xsub');
 const pubSocket = zmq.socket('xpub');
 const responder = zmq.socket('rep');
 const readline = require('readline');
+const inquirer = require('inquirer');
 
 const intervaloNTP = 120; // 120 segundos
 const puertoNTP = 4444
 const hostNTP = 'localhost' //'127.0.0.1'; // 
 const direccion = 'tcp://127.0.0.1:';
+
+// Parametros para las cola de mensajes
 const colasMensajes = [];
-const maxAgeColaMensajes;
-const cantMaxColaMensajes;
+var maxAgeColaMensajes;
+var cantMaxColaMensajes;
 
 const consola = readline.createInterface({
     input: process.stdin,
@@ -20,19 +23,14 @@ const consola = readline.createInterface({
 });
 
 var id_broker;
-var direccion = 'tcp://127.0.0.1:';
 var portRR;
 var portSUB;
 var portPUB;
 var listaTopicos = [];
 var intervalo = 120; // 120 segundos
 
-var puertoNTP = 4444
-var hostNTP = 'localhost' //'127.0.0.1'; // 
 
-
-//FALTA EL PUERTO PARA EL NTP
-
+// Crear interfaz para la consola
 var rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -107,10 +105,11 @@ responder.on('message', (jsonRequest) => {
     let request = JSON.parse(jsonRequest);
     console.log('Llego un mensaje con: ', request);
 
+    let respuesta;
     switch (request.accion) {
         case "listaTopicos":
             console.log('lista de topicos: ', listaTopicos);
-            let respuesta = {
+            respuesta = {
                 exito: true,
                 accion: request.accion,
                 idPeticion: request.idPeticion,
@@ -124,7 +123,7 @@ responder.on('message', (jsonRequest) => {
         case "listaMensajes":
             let colaMensajes = colasMensajes[colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico)]
 
-            let respuesta = {
+            respuesta = {
                 exito: true,
                 accion: request.accion,
                 idPeticion: request.idPeticion,
@@ -137,7 +136,7 @@ responder.on('message', (jsonRequest) => {
             break;
         case "limpiarColaMensajes":
             colasMensajes.filter(colaMensajes => colaMensajes.topico !== request.topico)
-            let respuesta = {
+            respuesta = {
                 exito: true,
                 accion: request.accion,
                 idPeticion: request.idPeticion,
@@ -147,7 +146,7 @@ responder.on('message', (jsonRequest) => {
         default:
             listaTopicos.push(request.topico);
             console.log('lista de topicos: ', listaTopicos);
-            let respuesta = {
+            respuesta = {
                 exito: true,
                 accion: request.accion,
                 idPeticion: request.idPeticion,
@@ -208,8 +207,6 @@ setInterval(() => {
         colaMensajes.forEach((mensaje) => {
             if (mensaje.timestamp < Date.now()) {
                 colaMensajes.shift();
-            } else {
-                break;
             }
         });
     })
