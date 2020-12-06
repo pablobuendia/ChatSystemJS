@@ -106,11 +106,13 @@ responder.on('message', (request) => {
                 i = eleccionDeBroker(req.topico, req);
                 console.log('i: ', i);
                 requester1.on('message', (err, response) =>{
-                    if (err){
+                    let res = response.toString();
+                    res = JSON.parse(res);
+                    if (res.exito == true){
                         respuesta = {
-                            exito: true,
+                            exito: res.exito,
                             accion: 1,
-                            idPeticion: req.idPeticion,
+                            idPeticion: res.idPeticion,
                             resultados: {
                                 datosBroker: []
                             }
@@ -118,18 +120,18 @@ responder.on('message', (request) => {
                         let datoTop = {
                             topico: req.topico,
                             ip: listaBrokers[i].ip,
-                            puerto: listaBrokers[i].portSUB
+                            puerto: listaBrokers[i].portPUB
                         };
                         respuesta.resultados.datosBroker.push(datoTop);
                     }
                     else {
                         respuesta = {
-                            exito: false,
+                            exito: res.exito,
                             accion: 1,
-                            idPeticion: req.idPeticion,
+                            idPeticion: res.idPeticion,
                             error: {      
-                                codigo: 2,
-                                mensaje: 'operacion inexistente'
+                                codigo: res.codigo,
+                                mensaje: res.mensaje
                             } 
                         };
                     }
@@ -142,7 +144,7 @@ responder.on('message', (request) => {
             }
             else{
                 respuesta = {
-                    exito: exit,
+                    exito: true,
                     accion: 1,
                     idPeticion: req.idPeticion,
                     resultados: {

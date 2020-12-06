@@ -2,41 +2,85 @@ const readline = require('readline');
 const intervalo = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
 const puertoNTP = 4444;
 const zmq = require('zeromq');
+const fs = require('fs');
 //const net = require('net');
 
 //var delay;
 var id_cliente; //----------------- IMPORTANTE 
+var ip_coordinador;
+var port_coordinador;
 var r1 = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
+var peticion = {
+    idPeticion,
+    accion,
+    topico
+};
+var comenzar = false;
+var lista_clientes_vivos = [];
+var topico = {
+    topico,
+    ip,
+    puerto
+};
+
+var requester = zmq.socket('req');
 
 r1.question('Ingrese su id: ', (answer) => {
     id_cliente = answer;
+    console.log("Espere por favor, conectando ... \n");
 });
 
 // subber.js
 //var subSocket = zmq.socket('sub'),
 //var pubSocket = zmq.socket('pub'),
-var requester = zmq.socket('req');
-
-// Connects REQ socket to tcp://localhost:5555
-
 
 // Conexion con el Coordinador
-requester.connect("tcp://127.0.0.1:5555"); //se tendria que poner en un archivo la ip y puerto del coordinador
+function suscripcion (ip, port){
 
-requester.on("message", function (reply) {
-    console.log("Received reply : [", reply.toString(), ']');
+}
+
+function solicitud_Informacion_Suscripcion (accion, topico, id_p){
+    peticion.accion = accion;
+    peticion.idPeticion = id_p;
+    peticion.topico = topico;
+    console.log('peticion: ', peticion.toString());
+    peticion = JSON.stringify(peticion);
+    requester.send(peticion);
+}
+
+
+fs.readFile('coordinador.txt', 'utf8', (err, data) => {
+    if (err){
+        console.log("Lamentablemente no es posible la conexion \n");
+    }
+    else{
+        let file = data.split(',');
+        ip_coordinador = file[0];
+        port_coordinador = file[1];
+        let dir = 'tcp://' + ip_coordinador + ':' + port_coordinador;
+        requester.connect(dir);
+        solicitud_Informacion_Suscripcion(2, 'message/'+id_cliente, id_cliente);
+    }
 });
 
-let peticion = {
-    idPeticion: 1, //Como se ponen los id de la Peticion? que regla sigue esto?
-    accion: 1, 
-    topico: 'All'
-}
-peticion = JSON.stringify(peticion);
-requester.send(peticion);
+requester.on("message", function (reply) { //deberia volver los ip y puertos de All, heartbeat y del cliente mismo
+    console.log("Received reply : [", reply.toString(), ']');
+    let response = JSON.parse(reply);
+    response = response.resultados.datosBroker;
+    console.log('response: ', response.toString());
+    response.forEach(element => {
+        topico.topico = element.topico;
+        topico.ip = element.ip;
+        topico.puerto = element.puerto;
+        lista_clientes_vivos.push(topico);
+    });
+
+});
+
+
 
 /*
 La conexión siguiente se tiene que hacer a partir de la devolución del coordinador a donde se tiene que conectar
