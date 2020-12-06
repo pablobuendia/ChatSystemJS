@@ -1,8 +1,10 @@
 const readline = require('readline');
+var ip_coordinador;
+var puerto_coordinador;
+const fs = require('fs');
 const intervalo = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
 const puertoNTP = 4444;
 const zmq = require('zeromq');
-const fs = require('fs');
 //const net = require('net');
 
 //var delay;
@@ -30,13 +32,27 @@ var requester = zmq.socket('req');
 
 r1.question('Ingrese su id: ', (answer) => {
     id_cliente = answer;
-    console.log("Espere por favor, conectando ... \n");
-});
 
+   /* fs.readFile("configuracion.txt",'utf8' , function(err,data){
+        if (err)
+        console.log(err);
+        else
+        {
+            let aux=data.split(",");
+            ip_coordinador= aux[1];
+            puerto_coordinador=aux[3];
+            console.log(puerto_coordinador);
+            console.log(ip_coordinador);
+            requester.connect("tcp://"+ip_coordinador+":"+puerto_coordinador) 
+        }*/
+    console.log("Espere por favor, conectando ... \n");
+//});
+
+
+})
 // subber.js
 //var subSocket = zmq.socket('sub'),
 //var pubSocket = zmq.socket('pub'),
-
 // Conexion con el Coordinador
 function suscripcion (ip, port){
 
@@ -50,7 +66,6 @@ function solicitud_Informacion_Suscripcion (accion, topico, id_p){
     peticion = JSON.stringify(peticion);
     requester.send(peticion);
 }
-
 
 fs.readFile('coordinador.txt', 'utf8', (err, data) => {
     if (err){
@@ -80,6 +95,14 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
 
 });
 
+
+let peticion = {
+    idPeticion: 1, 
+    accion: 1, 
+    topico: 'All'
+}
+peticion = JSON.stringify(peticion);
+requester.send(peticion);
 
 
 /*

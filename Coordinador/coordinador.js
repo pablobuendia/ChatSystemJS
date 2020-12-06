@@ -7,7 +7,7 @@ var listaBrokers = [];
 var totalTopicos = 0;
 
 var responder = zmq.socket('rep');
-responder.bind('tcp://127.0.0.1:5555');
+responder.bind('tcp://127.0.0.1:5050');
 
 var requester1 = zmq.socket('req');
 var requester2 = zmq.socket('req');  //HABRIA QUE INTENTAR CAMBIARLO A UN ARREGLO, POR AHORA ES ASI
