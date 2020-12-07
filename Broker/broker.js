@@ -10,12 +10,14 @@ const inquirer = require('inquirer');
 const intervaloNTP = 120; // 120 segundos
 const puertoNTP = 4444
 const hostNTP = 'localhost' //'127.0.0.1'; // 
-const direccion = 'tcp://127.0.0.1:';
+const direccionTCP = 'tcp://127.0.0.1:';
 
 // Parametros para las cola de mensajes
 const colasMensajes = [];
 var maxAgeColaMensajes;
 var cantMaxColaMensajes;
+
+// Objetivos del broker: 
 
 const consola = readline.createInterface({
     input: process.stdin,
@@ -46,7 +48,7 @@ function assignPort (idB){
     let file;
 
     id_broker = 'broker/'+idB;
-    fs.readFile('configuracion.txt', 'utf8', function(err, data){
+    fs.readFile('configuracionBroker.txt', 'utf8', function(err, data){
         if (err) {
             return console.log(err);
         }
@@ -54,11 +56,11 @@ function assignPort (idB){
         file = data.split(',');
 
         let i = file.indexOf('broker/'+idB);
-        portSUB = direccion.concat(file[i+1]);
+        portSUB = direccionTCP.concat(file[i+1]);
         subSocket.bindSync(portSUB);
-        portPUB = direccion.concat(file[i+2]);
+        portPUB = direccionTCP.concat(file[i+2]);
         pubSocket.bindSync(portPUB);
-        portRR = direccion.concat(file[i+3]);
+        portRR = direccionTCP.concat(file[i+3]);
         responder.bind(portRR);
         console.log('Puertos:\n PUB: '+portPUB+'\n portSUB: '+portSUB+'\n portRR: '+portRR);
     });
@@ -158,6 +160,8 @@ responder.on('message', (jsonRequest) => {
             break;
     }
 })
+
+
 /*
 {
              "exito": boolean,
@@ -170,6 +174,23 @@ responder.on('message', (jsonRequest) => {
                            }
 }
 */
+
+/**
+ * Funcion que recorre periodicamente las colas de mensajes para comprobar que no hayan vencido. Si es asi los remueve de la cola
+ */
+setInterval(() => {
+    colasMensajes.forEach(colaMensajes => {
+        colaMensajes.forEach((mensaje) => {
+            if (mensaje.timestamp < Date.now()) {
+                colaMensajes.shift();
+            }
+        });
+    })
+
+}, 1000);
+
+
+// --------------------- COMIENZO MODULO NTP -------------------------
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     setInterval(() => {
 
@@ -199,16 +220,4 @@ clienteNTP.on('data', function (data) {
     console.log("Delay calculado para broker: " + delay);
 });
 
-/**
- * Funcion que recorre periodicamente las colas de mensajes para comprobar que no hayan vencido. Si es asi los remueve de la cola
- */
-setInterval(() => {
-    colasMensajes.forEach(colaMensajes => {
-        colaMensajes.forEach((mensaje) => {
-            if (mensaje.timestamp < Date.now()) {
-                colaMensajes.shift();
-            }
-        });
-    })
-
-}, 1000);
+// --------------------- FIN MODULO NTP -------------------------

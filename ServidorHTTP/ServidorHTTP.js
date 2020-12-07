@@ -1,38 +1,64 @@
+"use strict";
 const http = require('http');
 const url = require('url');
 const zmq = require('zeromq');
-const requester = zmq.socket('req');
 
 const HOST = 'localhost';
 const PORT = 8080;
 const OK = 200;
 
-var idPeticionSuma = 0;
-requester.bind(5555);
+var generadorIdPeticion = 0;
 
+// Esta es la lista que va a almacenar las responses para responder a las request de los clientes
 var listaResponses = [];
 
-const responseHandler = function (request, response) {
+var listaRequesters = [];
+
+// Crear los requesters y almacenarlos en la lista
+for (let index = 1; index < 4; index++) {
+    let requester = zmq.socket('req');
+    requester.connect("tcp://localhost:" + (5554 + index));
+
+    listaRequesters.push({
+        id: 'broker' + index,
+        socket: requester
+    });
+}
+
+// Handler para el server
+const responseHandler = (request, response) => {
     const urlParseada = url.parse(request.url, true);
     const pathname = urlParseada.pathname;
     switch (request.method) {
         case 'GET':
-            let id = handleGetAction(pathname);
+            let idPeticionNueva = handleGetAction(pathname);
 
-            listaResponses.push({idPeticion : id, respuesta : response})
-            case 'OPTIONS':
+            // Si la id es -1 entonces no se encontro el broker
+            if (idPeticionNueva === -1) {
+                response.writeHead(400);
+                response.end(JSON.stringify({
+                    error: "No se encontro un broker con el codigo apropiado"
+                }));
+            } else {
+                listaResponses.push({
+                    idPeticion: id,
+                    respuesta: response
+                })
+            }
+            case 'OPTIONS': // Esta request se envia automaticamente por Chrome antes de enviar el DELETE
                 response.writeHead(200, getOptionsHeaders());
                 response.end();
             case 'DELETE':
 
             default:
-                response.writeHead(404);
+                response.writeHead(405);
                 response.end(JSON.stringify({
-                    error: "Resource not found"
+                    error: "Method not allowed"
                 }));
     }
 }
 
+// Conectarse al server
 const server = http.createServer(responseHandler);
 server.listen(PORT, HOST);
 
@@ -47,30 +73,33 @@ function getOptionsHeaders() {
 }
 
 function handleGetAction(pathname) {
-    let paths = pathname.split('/');
     let lastPath = paths[paths.length - 1];
-    if (lastPath == "topics") {
-        let idBroker = paths[2];
+    let idBroker = paths[2];
 
-        // Aca estoy mandando la request a un solo broker, faltaria unir el redirigir la 
-        requester.send({
-            idPeticion: idPeticionSuma++,
-            accion: "listaTopicos",
-            topico: null
-        })
+    // Encontrar el requester de acuerdo al codigo del broker
+    let requesterIndex = listaRequesters.findIndex(requester => requester.id = idBroker);
 
-        return idPeticion;
-    } else if (paths.includes("topics")) {
-        let idBroker = paths[2];
-        let topic = lastPath;
+    if (requesterIndex === -1) {
+        console.log("No se encontro un broker con la id buscada, se rechaza la respuesta");
+        return -1;
+    } else {
+        idPeticionNueva = generadorIdPeticion++;
+        if (lastPath == "topics") {
+            requester.send({
+                idPeticion: idPeticionNueva,
+                accion: "listaTopicos",
+                topico: null
+            })
+        } else if (paths.includes("topics")) {
+            let topic = lastPath;
 
-        requester.send({
-            idPeticion: idPeticionSuma++,
-            accion: "listaMensajes",
-            topico: topic
-        })
-
-        return idPeticion;
+            requester.send({
+                idPeticion: idPeticionNueva,
+                accion: "listaMensajes",
+                topico: topic
+            })
+        }
+        return idPeticionNueva;
     }
 }
 
@@ -98,7 +127,7 @@ requester.on("message", function (jsonReply) {
             console.log("No se encontro la respuesta");
         } else {
             let response = listaResponses[responseIndex];
-            
+
             response.writeHead(200);
             response.end(JSON.stringify(jsonReply));
         }
