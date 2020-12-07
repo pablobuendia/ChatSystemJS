@@ -6,6 +6,7 @@ const pubSocket = zmq.socket('xpub');
 const responder = zmq.socket('rep');
 const readline = require('readline');
 const inquirer = require('inquirer');
+const net =require('net');
 
 const intervaloNTP = 120; // 120 segundos
 const puertoNTP = 4444
