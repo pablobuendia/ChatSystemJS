@@ -1,12 +1,14 @@
 const readline = require('readline');
 var ip_coordinador;
 var puerto_coordinador;
+var inicio = true
 const fs = require('fs');
 const intervalo = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
 const puertoNTP = 4444;
 const zmq = require('zeromq');
 //const net = require('net');
-
+const cantidad_brokers=3;
+var conexionesBroker=[];
 //var delay;
 var id_cliente; //----------------- IMPORTANTE 
 var ip_coordinador;
@@ -16,21 +18,35 @@ var r1 = readline.createInterface({
     output: process.stdout
 });
 var peticion = {
-    idPeticion,
-    accion,
-    topico
+    idPeticion:undefined,
+    accion:undefined,
+    topico:undefined,
 };
 var comenzar = false;
 var lista_clientes_vivos = [];
 var topico = {
-    topico,
-    ip,
-    puerto
+    topic:undefined,
+    ip:undefined,
+    puerto:undefined
 };
 
-var requester = zmq.socket('req');
+    for( let i=0;i<cantidad_brokers;i++){
+     conexion=new Object ();
+       conexion.pub=zmq.socket('pub');
+       conexion.sub=zmq.socket('sub');
+       conexion.realizada= false;
+       conexion.ip=undefined;
+       puertosBroker[i]=conexion;
 
-r1.question('Ingrese su id: ', (answer) => {
+}
+     
+
+
+var requester = zmq.socket('req');
+ 
+if(inicio){
+r1.question('Ingrese su id: ', (answer) =>
+ {
     id_cliente = answer;
 
    /* fs.readFile("configuracion.txt",'utf8' , function(err,data){
@@ -49,7 +65,12 @@ r1.question('Ingrese su id: ', (answer) => {
 //});
 
 
+})}
+console.log("Ingrese el mensaje a enviar\n")
+r1.on('line',(data) => {
+procesarMensaje(data);
 })
+
 // subber.js
 //var subSocket = zmq.socket('sub'),
 //var pubSocket = zmq.socket('pub'),
@@ -57,19 +78,32 @@ r1.question('Ingrese su id: ', (answer) => {
 function suscripcion (ip, port){
 
 }
+function publicacion(ip,port ,mensaje){
+let msg=JSON.parse(mensaje)
+let j;
+while(j=0&&j<conexionesBroker.length&&!(conexionesBroker[j].ip.toString.equals(ip)&&((conexionesBroker[j].pub.toString.equals(port)))))
+ {
+    j++;
+}
+if(j<conexionesBroker.length)
+{
+    conexionesBroker[j].pub.send(mensaje)
+
+}
 
 function solicitud_Informacion_Suscripcion (accion, topico, id_p){
     peticion.accion = accion;
     peticion.idPeticion = id_p;
-    peticion.topico = topico;
+    peticion.topic = topico;
     console.log('peticion: ', peticion.toString());
     peticion = JSON.stringify(peticion);
     requester.send(peticion);
 }
 
-fs.readFile('coordinador.txt', 'utf8', (err, data) => {
+fs.readFile('coordinador.txt','utf8', (err, data) => {
     if (err){
         console.log("Lamentablemente no es posible la conexion \n");
+        console.log(err);
     }
     else{
         let file = data.split(',');
@@ -96,7 +130,7 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
 });
 
 
-let peticion = {
+ peticion = {
     idPeticion: 1, 
     accion: 1, 
     topico: 'All'

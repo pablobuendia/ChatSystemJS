@@ -8,11 +8,13 @@ var totalTopicos = 0;
 
 var responder = zmq.socket('rep');
 responder.bind('tcp://127.0.0.1:5050');
+requesters=[];
 
-var requester1 = zmq.socket('req');
-var requester2 = zmq.socket('req');  //HABRIA QUE INTENTAR CAMBIARLO A UN ARREGLO, POR AHORA ES ASI
-var requester3 = zmq.socket('req');
 
+for(let i=0;i<nroBroker;i++)
+{
+    requesters[i]=zmq.socket('req');
+}
 
 fs.readFile('configuracion.txt', 'utf8', (err, data) => {
     let file = data.split(',');
@@ -29,12 +31,10 @@ fs.readFile('configuracion.txt', 'utf8', (err, data) => {
         updateListaBrokers(objeto);
         i = i+5;
     }
-    let dir = 'tcp://' +listaBrokers[0].ip + ':' + listaBrokers[0].portRR;
-    requester1.connect(dir);
-    let dir2 = 'tcp://' +listaBrokers[1].ip + ':' + listaBrokers[1].portRR;
-    requester2.connect(dir2);
-    let dir3 = 'tcp://' +listaBrokers[2].ip + ':' + listaBrokers[2].portRR;
-    requester3.connect(dir3);
+    let dir;
+    for(let j =0; j<nroBroker; j++){
+     dir = 'tcp://' +listaBrokers[j].ip + ':' + listaBrokers[j].portRR;
+    requester[j].connect(dir);}
 });
 
 
