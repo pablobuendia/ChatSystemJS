@@ -1,150 +1,127 @@
 const readline = require('readline');
-var ip_coordinador;
-var puerto_coordinador;
-var inicio = true
 const fs = require('fs');
 const intervalo = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
 const puertoNTP = 4444;
 const zmq = require('zeromq');
 //const net = require('net');
 const cantidad_brokers=3;
-var conexionesBroker=[];
+
+
 //var delay;
+var inicio = true;
 var id_cliente; //----------------- IMPORTANTE 
 var ip_coordinador;
 var port_coordinador;
+var pub_heartbeat = zmq.socket('pub');
+
 var r1 = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
-var peticion = {
-    idPeticion:undefined,
-    accion:undefined,
-    topico:undefined,
-};
-var comenzar = false;
-var lista_clientes_vivos = [];
-var topico = {
+
+var conexiones_suscripcion=[]; //datos del broker a los topicos suscriptos (contiene obj.topico y obj.sub, socket)
+var lista_clientes_vivos = []; // lista de cliente vivos (contiene obj.topico y obj.pub, socket)
+/*var topico = {
     topic:undefined,
     ip:undefined,
     puerto:undefined
-};
-
-    for( let i=0;i<cantidad_brokers;i++){
-     conexion=new Object ();
-       conexion.pub=zmq.socket('pub');
-       conexion.sub=zmq.socket('sub');
-       conexion.realizada= false;
-       conexion.ip=undefined;
-       puertosBroker[i]=conexion;
-
-}
-     
-
+};*/
 
 var requester = zmq.socket('req');
+
  
 if(inicio){
-r1.question('Ingrese su id: ', (answer) =>
- {
-    id_cliente = answer;
+    r1.question('Ingrese su id: ', (answer) =>
+    {
+        id_cliente = answer;
+        fs.readFile('coordinador.txt','utf8', (err, data) => {
+            if (err){
+                console.log("Lamentablemente no es posible la conexion \n");
+                console.log(err);
+            }
+            else{
+                let file = data.split(',');
+                ip_coordinador = file[0];
+                port_coordinador = file[1];
+                let dir = 'tcp://' + ip_coordinador + ':' + port_coordinador;
+                requester.connect(dir);
+                console.log('Estoy aqui!');
+                solicitud_Informacion_Coordinador(2, 'message/'+id_cliente, id_cliente);
+            }
+        });
+        console.log("Espere por favor, conectando ... \n");
+    });
+};
 
-   /* fs.readFile("configuracion.txt",'utf8' , function(err,data){
-        if (err)
-        console.log(err);
-        else
-        {
-            let aux=data.split(",");
-            ip_coordinador= aux[1];
-            puerto_coordinador=aux[3];
-            console.log(puerto_coordinador);
-            console.log(ip_coordinador);
-            requester.connect("tcp://"+ip_coordinador+":"+puerto_coordinador) 
-        }*/
-    console.log("Espere por favor, conectando ... \n");
-//});
-
-
-})}
-console.log("Ingrese el mensaje a enviar\n")
+/*console.log("Ingrese el mensaje a enviar\n")
 r1.on('line',(data) => {
 procesarMensaje(data);
-})
+})*/
 
-// subber.js
-//var subSocket = zmq.socket('sub'),
-//var pubSocket = zmq.socket('pub'),
+
 // Conexion con el Coordinador
-function suscripcion (ip, port){
-
-}
+/*
 function publicacion(ip,port ,mensaje){
 let msg=JSON.parse(mensaje)
 let j;
-while(j=0&&j<conexionesBroker.length&&!(conexionesBroker[j].ip.toString.equals(ip)&&((conexionesBroker[j].pub.toString.equals(port)))))
+while(j=0&&j<lista_clientes_vivos.length&&!(lista_clientes_vivos[j].ip.toString.equals(ip)&&((lista_clientes_vivos[j].pub.toString.equals(port)))))
  {
     j++;
 }
-if(j<conexionesBroker.length)
+if(j<lista_clientes_vivos.length)
 {
-    conexionesBroker[j].pub.send(mensaje)
+    lista_clientes_vivos[j].pub.send(mensaje)
 
-}
+}*/
 
-function solicitud_Informacion_Suscripcion (accion, topico, id_p){
+function solicitud_Informacion_Coordinador (accion, topico, id_p){
+    let peticion = new Object();
     peticion.accion = accion;
     peticion.idPeticion = id_p;
-    peticion.topic = topico;
-    console.log('peticion: ', peticion.toString());
+    peticion.topico = topico;
     peticion = JSON.stringify(peticion);
+    console.log('peticion: ', peticion);
     requester.send(peticion);
-}
-
-fs.readFile('coordinador.txt','utf8', (err, data) => {
-    if (err){
-        console.log("Lamentablemente no es posible la conexion \n");
-        console.log(err);
-    }
-    else{
-        let file = data.split(',');
-        ip_coordinador = file[0];
-        port_coordinador = file[1];
-        let dir = 'tcp://' + ip_coordinador + ':' + port_coordinador;
-        requester.connect(dir);
-        solicitud_Informacion_Suscripcion(2, 'message/'+id_cliente, id_cliente);
-    }
-});
+};
 
 requester.on("message", function (reply) { //deberia volver los ip y puertos de All, heartbeat y del cliente mismo
-    console.log("Received reply : [", reply.toString(), ']');
     let response = JSON.parse(reply);
-    response = response.resultados.datosBroker;
-    console.log('response: ', response.toString());
-    response.forEach(element => {
-        topico.topico = element.topico;
-        topico.ip = element.ip;
-        topico.puerto = element.puerto;
-        lista_clientes_vivos.push(topico);
-    });
+    let datos_broker = response.resultados.datosBroker;
+    console.log('datos broker: ', datos_broker);
+    if (response.accion == 2){ //Si es una respuesta al pedido de datos de los brokers para suscripcion
+        datos_broker.forEach(element => {
+            asunto = new Object();
+            asunto.topico = element.topico;
+            asunto.sub = zmq.socket('sub');
+            asunto.sub.connect('tcp://' + element.ip + ':' + element.puerto);
+            asunto.sub.suscribe(element.topico);
+            conexiones_suscripcion.push(asunto);
+        });
+        solicitud_Informacion_Coordinador(1, 'heartbeat', id_cliente);
+    }
+    else { //Si es una respuesta al pedido de datos de un broker para publicacion
+        if( response.topico == 'heartbeat'){
+            pub_heartbeat.connect('tcp://' + datos_broker.ip + ':' + datos_broker.puerto);
+            let interval = setInterval(() => {
+                let mensaje = new Object();
+                mensaje.emisor = id_cliente;
+                mensaje.fecha = new Date().getTime().toISOString();
+                mensaje = JSON.stringify(mensaje);
+                pub_heartbeat.send(mensaje);
+            }, 10000);
+            console.log('Puede comenzar a escribir');
+        }
+        else{ 
 
+        }
+    }
+    
 });
 
-
- peticion = {
-    idPeticion: 1, 
-    accion: 1, 
-    topico: 'All'
-}
-peticion = JSON.stringify(peticion);
-requester.send(peticion);
 
 
 /*
 La conexión siguiente se tiene que hacer a partir de la devolución del coordinador a donde se tiene que conectar
-
-subSocket.connect('tcp://127.0.0.1:3001');
-pubSocket.connect('tcp://127.0.0.1:3000');
-subSocket.subscribe('All');
 
 
 PREGUNTA: por cada broker al que se quiere conectar debe tener un subSocket y un pubSocket? ---------------------------------- PREGUNTA

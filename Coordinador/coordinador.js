@@ -7,10 +7,10 @@ var listaBrokers = [];
 var totalTopicos = 0;
 
 var responder = zmq.socket('rep');
-responder.bind('tcp://127.0.0.1:5050');
+responder.bind('tcp://127.0.0.1:5555');
 requesters=[];
 
-
+/*
 for(let i=0;i<nroBroker;i++)
 {
     requesters[i]=zmq.socket('req');
@@ -34,7 +34,8 @@ fs.readFile('configuracion.txt', 'utf8', (err, data) => {
     let dir;
     for(let j =0; j<nroBroker; j++){
      dir = 'tcp://' +listaBrokers[j].ip + ':' + listaBrokers[j].portRR;
-    requester[j].connect(dir);}
+     console.log('dir: ', dir);
+    requesters[j].connect(dir);}
 });
 
 
@@ -86,20 +87,21 @@ function notificarBroker (topico, index, request){
             requester3.send(request);
             break;
     }
-}
+}*/
 
 
 responder.on('message', (request) => {
   let req = request.toString();
   req = JSON.parse(req);
-  console.log(req.accion);
+  console.log(req);
   let respuesta;
   let i;
   let exit = false;
   switch (req.accion) {
         case 1:
+            
             //Cliente le pide al coordinador el puerto e ip de un broker con el topico para PUBLICAR 
-            i = verificaExistenciaTopico(req.topico);
+            /*i = verificaExistenciaTopico(req.topico);
             console.log('i:', i);
             if ( i == -1){ 
                 //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
@@ -142,31 +144,56 @@ responder.on('message', (request) => {
                     responder.send(respuesta);
                 });
             }
-            else{
+            else{*/
                 respuesta = {
                     exito: true,
                     accion: 1,
                     idPeticion: req.idPeticion,
                     resultados: {
-                        datosBroker: []
+                        datosBroker: [{topico:'heartbeat',ip:'127.0.0.1',puerto:'3011'}]
                     }
                 };
-                let datoTop = {
+                /*let datoTop = {
                     topico: req.topico,
                     ip: listaBrokers[i].ip,
                     puerto: listaBrokers[i].portSUB
                 };
-                respuesta.resultados.datosBroker.push(datoTop);
+                respuesta.resultados.datosBroker.push(datoTop);*/
                 
                 console.log('Respuesta enviada: ', respuesta);
                 respuesta = JSON.stringify(respuesta);
                 
                 responder.send(respuesta);
-            } //SE TIENE QUE ENVIAR AQUI POR EL ASINCRONISMO
+            //} //SE TIENE QUE ENVIAR AQUI POR EL ASINCRONISMO
             break;
-        case '2':
-            //Se pide el broker para SUSCRIBIRSE 
-
+        case 2:
+            respuesta = {
+                exito: true,
+                accion: 2,
+                idPeticion: req.idPeticion,
+                resultados: {
+                    datosBroker: [
+                        {
+                            topico:'All',
+                            ip:'127.0.0.1',
+                            puerto:'3000'
+                        },
+                        {
+                            topico:'heartbeat',
+                            ip:'127.0.0.1',
+                            puerto:'3010'
+                        },
+                        {
+                            topico:'1',
+                            ip:'127.0.0.1',
+                            puerto:'3100'
+                        }
+                    ]
+                }
+            };
+            respuesta = JSON.stringify(respuesta);
+            console.log('respuesta enviada: ', respuesta);
+            responder.send(respuesta);
             break;
         case '3':
             break;
