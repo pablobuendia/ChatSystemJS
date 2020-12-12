@@ -92,31 +92,27 @@ function notificarBroker (index, request){
 function consultar_broker (req, callback){
     let respuesta;
     let i;
-    console.log('La request enviada es: ', req);
-    i = verificaExistenciaTopico(req.topico);
+    let topico = req.topico;
+    i = verificaExistenciaTopico(topico);
     if ( i == -1){ 
         //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
         i = eleccionDeBroker(req);
-        console.log('La request enviada AHORA es: ', req);
         requesters.forEach((element) => {
             element.on('message', (response, err) =>{
-                //console.log('ACA ERROR', err.toString());
                 let res = response.toString();
                 res = JSON.parse(res);
-                console.log('Respuesta del broker: ', res);
                 if (res.exito == true){
                     respuesta = {
                         exito: res.exito,
                         datosBroker: new Object()
                     };
-                    console.log('ACA TENES EL TOPICO: ', req.topico);
-                    respuesta.datosBroker.topico = req.topico;
+                    respuesta.datosBroker.topico = topico;
                     respuesta.datosBroker.ip = listaBrokers[i].ip;
                     if (req.accion == 1) {
-                        respuesta.datosBroker.puerto = listaBrokers[i].portPUB
+                        respuesta.datosBroker.puerto = listaBrokers[i].portSUB
                     }
                     else{
-                        respuesta.datosBroker.puerto = listaBrokers[i].portSUB
+                        respuesta.datosBroker.puerto = listaBrokers[i].portPUB
                     }
                 }
                 else {
@@ -137,13 +133,13 @@ function consultar_broker (req, callback){
             exito: true,
             datosBroker: new Object()
         };
-        respuesta.datosBroker.topico = req.topico;
+        respuesta.datosBroker.topico = topico;
         respuesta.datosBroker.ip = listaBrokers[i].ip;
         if (req.accion == 1) {
-            respuesta.datosBroker.puerto = listaBrokers[i].portPUB
+            respuesta.datosBroker.puerto = listaBrokers[i].portSUB
         }
         else{
-            respuesta.datosBroker.puerto = listaBrokers[i].portSUB
+            respuesta.datosBroker.puerto = listaBrokers[i].portPUB
         }
         callback(respuesta);
     }
@@ -151,18 +147,7 @@ function consultar_broker (req, callback){
 
 function callBroker (req, callback){
     consultar_broker(req, (consulta) => {
-        //console.log('respuesta de consulta: ', consulta);
-       /* if (consulta.exito != true){
-            callback({
-                codigo: cosulta.error.codigo,
-                mensaje: consulta.error.mensaje
-            });
-            /*respuesta.resultados = {datosBroker:[]};
-            respuesta.resultados.datosBroker.push(consulta.datosBroker);
-        }
-        else{*/
-            callback (consulta);
-        //}
+        callback (consulta);
     });
 };
 
@@ -196,21 +181,20 @@ responder.on('message', (request) => {
   req = JSON.parse(req);
   console.log(req);
   //let respuesta;
-  let consulta;
   switch (req.accion) {
-        case 1:
+        case 1: //publicacion
             consultar_broker(req, (consulta) => {
                 respuesta = new Object();
                 respuesta.exito = consulta.exito;
                 respuesta.accion = req.accion;
                 respuesta.idPeticion = req.idPeticion;
-                if (consulta.exito == 'true'){
+                if (consulta.exito == true){
                     respuesta.resultados = {datosBroker:[]};
                     respuesta.resultados.datosBroker.push(consulta.datosBroker);
                 }
                 else{
                     respuesta.error = {
-                        codigo: cosulta.error.codigo,
+                        codigo: consulta.error.codigo,
                         mensaje: consulta.error.mensaje
                     };
                 }      
@@ -228,137 +212,21 @@ responder.on('message', (request) => {
             respuesta.accion = req.accion;
             respuesta.idPeticion = req.idPeticion;
             callAllBroker(req, (responses) =>{
-                console.log('RESPUESTAAAAAAAAAAAAAAAAA: ', responses);
                 const AllExito = (currentValue) => currentValue.exito == true;
-                if (responses.every(AllExito)){
-                    respuesta.exito = true;
+                respuesta.exito = responses.every(AllExito);
+                if (respuesta.exito){
+                    const datosBroker = (currentValue) => currentValue.datosBroker;
+                    respuesta.resultados = {
+                        datosBroker: responses.map(datosBroker)
+                    };
                 }
                 else{
-                    respuesta.exito = false;
+                    respuesta.error = responses.find(element => element.error != null).error;
                 }
+                console.log(respuesta);
                 responder.send(JSON.stringify(respuesta));
             })
-            /*while ((respuesta.exito == true) && (i <= 3)){
-                
-                
-                i++;
-                if ((respuesta.exito == false) || (i == 3)){
-                    enviar = 3;
-                }
-            }*/
-            /*while (enviar < 4){ //El 3 representa: All, heartbeat y el mismo cliente que solicito
-                if (enviar == 3){
-                    respuesta = JSON.stringify(respuesta);
-                    console.log('Respuesta enviada: ', respuesta);
-                    responder.send(respuesta);
-                    largo = 4;
-                }
-            }*/
             break;
-            /*
-            
-            i = verificaExistenciaTopico(req.topico);
-            console.log('i:', i);
-            if ( i == -1){ 
-                //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
-                i = eleccionDeBroker(req.topico, req);
-                console.log('i: ', i);
-                requester1.on('message', (err, response) =>{
-                    let res = response.toString();
-                    res = JSON.parse(res);
-                    if (res.exito == true){
-                        respuesta = {
-                            exito: res.exito,
-                            accion: 1,
-                            idPeticion: res.idPeticion,
-                            resultados: {
-                                datosBroker: []
-                            }
-                        };
-                        let datoTop = {
-                            topico: req.topico,
-                            ip: listaBrokers[i].ip,
-                            puerto: listaBrokers[i].portPUB
-                        };
-                        respuesta.resultados.datosBroker.push(datoTop);
-                    }
-                    else {
-                        respuesta = {
-                            exito: res.exito,
-                            accion: 1,
-                            idPeticion: res.idPeticion,
-                            error: {      
-                                codigo: res.codigo,
-                                mensaje: res.mensaje
-                            } 
-                        };
-                    }
-                    
-                    respuesta = JSON.stringify(respuesta);
-                    console.log('Respuesta enviada: ', respuesta);
-            
-                    responder.send(respuesta);
-                });
-            }
-            else{
-                respuesta = {
-                    exito: true,
-                    accion: 1,
-                    idPeticion: req.idPeticion,
-                    resultados: {
-                        datosBroker: [{topico:'heartbeat',ip:'127.0.0.1',puerto:'3011'}]
-                    }
-                };
-                let datoTop = {
-                    topico: req.topico,
-                    ip: listaBrokers[i].ip,
-                    puerto: listaBrokers[i].portSUB
-                };
-                respuesta.resultados.datosBroker.push(datoTop);
-                
-                console.log('Respuesta enviada: ', respuesta);
-                respuesta = JSON.stringify(respuesta);
-                
-                responder.send(respuesta);
-            //} //SE TIENE QUE ENVIAR AQUI POR EL ASINCRONISMO*/
-        /*case 2:
-            respuesta = {
-                exito: true,
-                accion: 2,
-                idPeticion: req.idPeticion,
-                resultados: {
-                    datosBroker: [
-                        {
-                            topico:'All',
-                            ip:'127.0.0.1',
-                            puerto:'3000'
-                        },
-                        {
-                            topico:'heartbeat',
-                            ip:'127.0.0.1',
-                            puerto:'3010'
-                        },
-                        {
-                            topico:'1',
-                            ip:'127.0.0.1',
-                            puerto:'3100'
-                        }
-                    ]
-                }
-            };
-            respuesta = JSON.stringify(respuesta);
-            console.log('respuesta enviada: ', respuesta);
-            responder.send(respuesta);
-            break;*/
   }
-  /*Recibe:
-  { 
-    “idPeticion”:  id,
-    “accion”: “cod_op”, 
-    “topico”: “nombreTopico”,
-     
-    } 
-  */  
-  //console.log("Received request: [", request.toString(), "]");
 });
 

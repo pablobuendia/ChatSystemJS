@@ -20,7 +20,7 @@ var r1 = readline.createInterface({
 });
 
 var conexiones_suscripcion=[]; //datos del broker a los topicos suscriptos (contiene obj.topico y obj.sub, socket)
-var lista_clientes_vivos = []; // lista de cliente vivos (contiene obj.topico y obj.pub, socket)
+var lista_clientes_vivos = []; // lista de cliente vivos para publicar (contiene obj.topico y obj.pub, socket)
 /*var topico = {
     topic:undefined,
     ip:undefined,
@@ -45,7 +45,6 @@ if(inicio){
                 port_coordinador = file[1];
                 let dir = 'tcp://' + ip_coordinador + ':' + port_coordinador;
                 requester.connect(dir);
-                console.log('Estoy aqui!');
                 solicitud_Informacion_Coordinador(2, 'message/'+id_cliente, id_cliente);
             }
         });
@@ -80,60 +79,65 @@ function solicitud_Informacion_Coordinador (accion, topico, id_p){
     peticion.idPeticion = id_p;
     peticion.topico = topico;
     peticion = JSON.stringify(peticion);
-    console.log('peticion: ', peticion);
     requester.send(peticion);
 };
 
 requester.on("message", function (reply) { //deberia volver los ip y puertos de All, heartbeat y del cliente mismo
     let response = JSON.parse(reply);
     let datos_broker = response.resultados.datosBroker;
-    console.log('datos broker: ', datos_broker);
     if (response.accion == 2){ //Si es una respuesta al pedido de datos de los brokers para suscripcion
         datos_broker.forEach(element => {
-            asunto = new Object();
+            let asunto = new Object();
             asunto.topico = element.topico;
             asunto.sub = zmq.socket('sub');
             asunto.sub.connect('tcp://' + element.ip + ':' + element.puerto);
-            asunto.sub.suscribe(element.topico);
+            console.log('ELEMENTO: ', element);
+            asunto.sub.subscribe(element.topico.toString());
             conexiones_suscripcion.push(asunto);
         });
-       // solicitud_Informacion_Coordinador(1, 'heartbeat', id_cliente);
+        //console.log(conexiones_suscripcion);
+        solicitud_Informacion_Coordinador(1, 'heartbeat', id_cliente);
+        conexiones_suscripcion.forEach((element) => { //que lo hace cuando recibe un mensaje de algun topico
+            element.sub.on('message', (topic, mensaje) => {
+                topic = topic.toString();
+                mensaje = JSON.parse(mensaje);
+                if ((topic != 'heartbeat') && (mensaje.emisior != id_cliente)){
+                    console.log(topic + mensaje);
+                }
+                else if ((topic == 'heartbeat') && (mensaje.emisior != id_cliente)){
+                    //debe actualizar la lista de clientes vivos. 
+                    
+                }
+            });
+        });
     }
     else { //Si es una respuesta al pedido de datos de un broker para publicacion
-        if( response.topico == 'heartbeat'){
-            pub_heartbeat.connect('tcp://' + datos_broker.ip + ':' + datos_broker.puerto);
-            let interval = setInterval(() => {
+        if( datos_broker[0].topico == 'heartbeat'){
+            pub_heartbeat.connect('tcp://' + datos_broker[0].ip + ':' + datos_broker[0].puerto);
+            console.log('tcp://' + datos_broker[0].ip + ':' + datos_broker[0].puerto);
+        
+            var interval = setInterval(() => {
                 let mensaje = new Object();
                 mensaje.emisor = id_cliente;
-                mensaje.fecha = new Date().getTime().toISOString();
+                mensaje.fecha = new Date().toISOString();
                 mensaje = JSON.stringify(mensaje);
-                pub_heartbeat.send(mensaje);
+                pub_heartbeat.send(['heartbeat', mensaje]);
             }, 10000);
             console.log('Puede comenzar a escribir');
         }
         else{ 
-
+            //cuando se pide datos de un topico para publicar que no se heartbeat
         }
     }
-    
 });
+
+
 
 
 
 /*
 La conexión siguiente se tiene que hacer a partir de la devolución del coordinador a donde se tiene que conectar
 
-
-PREGUNTA: por cada broker al que se quiere conectar debe tener un subSocket y un pubSocket? ---------------------------------- PREGUNTA
-Porque se tiene que conectar a diferentes puertos para recibir mensaje de los distintos topicos
-
-subSocket.on('message', function (topic, message) {
-    let mensaje = message.toString();
-    mensaje = JSON.parse(mensaje);
-    if (mensaje.id_cliente != id_cliente) {
-        console.log('Recibio topico: ', topic.toString(), ' con mensaje: ', mensaje.mensaje);
-    }
-});
 
 
 r1.on('line', (mensaje) => {

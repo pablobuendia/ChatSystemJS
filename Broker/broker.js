@@ -58,6 +58,7 @@ function assignPort (idB){
 
         let i = file.indexOf('broker/'+idB);
         portSUB = direccionTCP.concat(file[i+1]);
+        //subSocket.subscribe("".getBytes());
         subSocket.bindSync(portSUB);
         portPUB = direccionTCP.concat(file[i+2]);
         pubSocket.bindSync(portPUB);
@@ -70,7 +71,8 @@ function assignPort (idB){
 
 // Redirige todos los mensajes que recibimos
 subSocket.on('message', function (topic, message) {
-    if (listaTopicos.includes(topic)){
+    if (listaTopicos.includes(topic.toString())){  
+        console.log(message.toString() + 'llegooooooo');
         pubSocket.send([topic, message]);
 
         // Meter mensaje en la cola
@@ -100,7 +102,9 @@ subSocket.on('message', function (topic, message) {
 
 // Cuando el pubSocket recibe un tópico, subSocket debe subscribirse a él; para eso se utiliza el método send
 pubSocket.on('message', function (topic) {
-	subSocket.send(topic)
+    if (!(listaTopicos.includes(topic.toString()))){
+        subSocket.send(topic.toString());
+    };
 });
 
 responder.on('message', (jsonRequest) => {
@@ -147,14 +151,14 @@ responder.on('message', (jsonRequest) => {
             };
             break;
         default:
-            listaTopicos.push(request.topico);
+            listaTopicos.push(request.topico); //que no agrege dos veces el mismo topico
             console.log('lista de topicos: ', listaTopicos);
             respuesta = {
                 exito: true,
                 accion: request.accion,
                 idPeticion: request.idPeticion,
                 resultados: {},
-                topico:request.to
+                topico:request.topico
             };
             responder.send(JSON.stringify(respuesta));
 
