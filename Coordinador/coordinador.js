@@ -33,9 +33,10 @@ fs.readFile('configuracion.txt', 'utf8', (err, data) => {
     }
     let dir;
     for(let j =0; j<nroBroker; j++){
-     dir = 'tcp://' +listaBrokers[j].ip + ':' + listaBrokers[j].portRR;
-     console.log('dir: ', dir);
-    requesters[j].connect(dir);}
+        dir = 'tcp://' +listaBrokers[j].ip + ':' + listaBrokers[j].portRR;
+        console.log('dir: ', dir);
+        requesters[j].connect(dir);
+    }
 });
 
 
@@ -63,143 +64,198 @@ function verificaExistenciaTopico (topico){
     }
 };
 
-function eleccionDeBroker (topico, req){
+function eleccionDeBroker (req){
     totalTopicos++;
-    let index = (totalTopicos % nroBroker) - 1;
-    listaBrokers[index].topicos.push(topico);
+    let index = (totalTopicos % nroBroker);
+    listaBrokers[index].topicos.push(req.topico);
     console.log('El broker elegido fue: ', index, '\n lista Brokers nueva: ', listaBrokers[index]);
     console.log('i ', index);
-    notificarBroker(req.topico, index, req);
+    notificarBroker(index, req);
     return index;
 }
 
-function notificarBroker (topico, index, request){
+function notificarBroker (index, request){
     request = JSON.stringify(request);
     switch (index){
         case 0:
-            console.log('peticion de topico enviado al broker 1');
-            requester1.send(request);
+            requesters[0].send(request);
             break; 
         case 1:
-            requester2.send(request);
+            requesters[1].send(request);
             break;
         case 2:
-            requester3.send(request);
+            requesters[2].send(request);
             break;
     }
 }
 
-function consultar_broker (req){
+function consultar_broker (req, callback){
     let respuesta;
+    let i;
+    console.log('La request enviada es: ', req);
     i = verificaExistenciaTopico(req.topico);
     if ( i == -1){ 
         //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
-        i = eleccionDeBroker(req.topico, req);
-        requester1.on('message', (err, response) =>{
-            let res = response.toString();
-            res = JSON.parse(res);
-            if (res.exito == true){
-                respuesta = {
-                    exito: res.exito,
-                    datosBroker: new Object()
-                };
-                datosBroker.topico = req.topico;
-                datosBroker.ip = listaBrokers[i].ip;
-                if (req.accion == 1) {
-                    datosBroker.puerto = listaBrokers[i].portPUB
+        i = eleccionDeBroker(req);
+        console.log('La request enviada AHORA es: ', req);
+        requesters.forEach((element) => {
+            element.on('message', (response, err) =>{
+                //console.log('ACA ERROR', err.toString());
+                let res = response.toString();
+                res = JSON.parse(res);
+                console.log('Respuesta del broker: ', res);
+                if (res.exito == true){
+                    respuesta = {
+                        exito: res.exito,
+                        datosBroker: new Object()
+                    };
+                    console.log('ACA TENES EL TOPICO: ', req.topico);
+                    respuesta.datosBroker.topico = req.topico;
+                    respuesta.datosBroker.ip = listaBrokers[i].ip;
+                    if (req.accion == 1) {
+                        respuesta.datosBroker.puerto = listaBrokers[i].portPUB
+                    }
+                    else{
+                        respuesta.datosBroker.puerto = listaBrokers[i].portSUB
+                    }
                 }
-                else{
-                    datosBroker.puerto = listaBrokers[i].portSUB
+                else {
+                    respuesta = {
+                        exito: res.exito,
+                        error: {      
+                            codigo: res.codigo,
+                            mensaje: res.mensaje
+                        } 
+                    };
                 }
-            }
-            else {
-                respuesta = {
-                    exito: res.exito,
-                    error: {      
-                        codigo: res.codigo,
-                        mensaje: res.mensaje
-                    } 
-                };
-            }
-            return respuesta;
-        });
-    }
+                callback(respuesta);
+            });
+        })
+    }                               
     else{
         respuesta = {
             exito: true,
             datosBroker: new Object()
         };
-        datosBroker.topico = req.topico;
-        datosBroker.ip = listaBrokers[i].ip;
+        respuesta.datosBroker.topico = req.topico;
+        respuesta.datosBroker.ip = listaBrokers[i].ip;
         if (req.accion == 1) {
-            datosBroker.puerto = listaBrokers[i].portPUB
+            respuesta.datosBroker.puerto = listaBrokers[i].portPUB
         }
         else{
-            datosBroker.puerto = listaBrokers[i].portSUB
+            respuesta.datosBroker.puerto = listaBrokers[i].portSUB
         }
-        return respuesta;
+        callback(respuesta);
     }
+}
+
+function callBroker (req, callback){
+    consultar_broker(req, (consulta) => {
+        //console.log('respuesta de consulta: ', consulta);
+       /* if (consulta.exito != true){
+            callback({
+                codigo: cosulta.error.codigo,
+                mensaje: consulta.error.mensaje
+            });
+            /*respuesta.resultados = {datosBroker:[]};
+            respuesta.resultados.datosBroker.push(consulta.datosBroker);
+        }
+        else{*/
+            callback (consulta);
+        //}
+    });
+};
+
+function callAllBroker (req, callback){
+    let contador = 0;
+    let responses = [];
+    for (let i=0; i<3; i++){
+        switch (i){
+            case 1:
+                req.topico = 'All';
+                console.log('REALIZO EL CAMBIO A ALL\n');
+                break;
+            case 2:
+                req.topico = 'heartbeat';
+                console.log('REALIZO EL CAMBIO A HEARTBEAT\n');
+                break;
+        }
+        callBroker(req, (response) => {
+            contador++;
+            responses.push(response);
+            if (contador == 3){
+                callback(responses);
+            }
+        });
+    }
+    
 }
 
 responder.on('message', (request) => {
   let req = request.toString();
   req = JSON.parse(req);
   console.log(req);
-  let respuesta;
-  let i;
-  let exit = false;
+  //let respuesta;
+  let consulta;
   switch (req.accion) {
         case 1:
-            let consulta = consultar_broker(req);
-            respuesta = new Object();
-            respuesta.exito = consulta.exito;
-            respuesta.accion = req.accion;
-            respuesta.idPeticion = req.idPeticion;
-            if (consulta.exito == 'true'){
-                respuesta.resultados = {datosBroker:[]};
-                respuesta.resultados.datosBroker.push(consulta.datosBroker);
-            }
-            else{
-                respuesta.error = {
-                    codigo: cosulta.error.codigo,
-                    mensaje: consulta.error.mensaje
-                };
-            }      
-            respuesta = JSON.stringify(respuesta);
-            console.log('Respuesta enviada: ', respuesta);
-            responder.send(respuesta);
+            consultar_broker(req, (consulta) => {
+                respuesta = new Object();
+                respuesta.exito = consulta.exito;
+                respuesta.accion = req.accion;
+                respuesta.idPeticion = req.idPeticion;
+                if (consulta.exito == 'true'){
+                    respuesta.resultados = {datosBroker:[]};
+                    respuesta.resultados.datosBroker.push(consulta.datosBroker);
+                }
+                else{
+                    respuesta.error = {
+                        codigo: cosulta.error.codigo,
+                        mensaje: consulta.error.mensaje
+                    };
+                }      
+                respuesta = JSON.stringify(respuesta);
+                console.log('Respuesta enviada: ', respuesta);
+                responder.send(respuesta);
+            });
             break;
         case 2:
             //Cliente le pide al coordinador el puerto e ip de un broker con el topico para PUBLICAR
-            let consulta; 
+            let enviar = 0; 
+            let i = 1;
+            let topico;
             respuesta = new Object();
-            for (let i = 1; i<=3; i++){
-                consulta = consultar_broker(req);
-
-
-               
-            }
-            respuesta.exito = consulta.exito;
             respuesta.accion = req.accion;
             respuesta.idPeticion = req.idPeticion;
-            if (consulta.exito == 'true'){
-                respuesta.resultados = {datosBroker:[]};
-                respuesta.resultados.datosBroker.push(consulta.datosBroker);
-            }
-            else{
-                respuesta.error = {
-                    codigo: cosulta.error.codigo,
-                    mensaje: consulta.error.mensaje
-                };
-            }
-            while (respuesta.resultados.datosBroker.length != 3){ //El 3 representa: All, heartbeat y el mismo cliente que solicito
-
-            }
-            respuesta = JSON.stringify(respuesta);
-            console.log('Respuesta enviada: ', respuesta);
-            responder.send(respuesta);
+            callAllBroker(req, (responses) =>{
+                console.log('RESPUESTAAAAAAAAAAAAAAAAA: ', responses);
+                const AllExito = (currentValue) => currentValue.exito == true;
+                if (responses.every(AllExito)){
+                    respuesta.exito = true;
+                }
+                else{
+                    respuesta.exito = false;
+                }
+                responder.send(JSON.stringify(respuesta));
+            })
+            /*while ((respuesta.exito == true) && (i <= 3)){
+                
+                
+                i++;
+                if ((respuesta.exito == false) || (i == 3)){
+                    enviar = 3;
+                }
+            }*/
+            /*while (enviar < 4){ //El 3 representa: All, heartbeat y el mismo cliente que solicito
+                if (enviar == 3){
+                    respuesta = JSON.stringify(respuesta);
+                    console.log('Respuesta enviada: ', respuesta);
+                    responder.send(respuesta);
+                    largo = 4;
+                }
+            }*/
             break;
-            
+            /*
             
             i = verificaExistenciaTopico(req.topico);
             console.log('i:', i);
@@ -264,8 +320,7 @@ responder.on('message', (request) => {
                 respuesta = JSON.stringify(respuesta);
                 
                 responder.send(respuesta);
-            //} //SE TIENE QUE ENVIAR AQUI POR EL ASINCRONISMO
-            break;
+            //} //SE TIENE QUE ENVIAR AQUI POR EL ASINCRONISMO*/
         /*case 2:
             respuesta = {
                 exito: true,
@@ -295,14 +350,6 @@ responder.on('message', (request) => {
             console.log('respuesta enviada: ', respuesta);
             responder.send(respuesta);
             break;*/
-        case '4':
-            break;
-        case '5':
-            break;
-        case '6':
-            break;
-        case '7':
-            break;
   }
   /*Recibe:
   { 

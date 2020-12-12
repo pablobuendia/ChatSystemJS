@@ -5,7 +5,7 @@ const subSocket = zmq.socket('xsub');
 const pubSocket = zmq.socket('xpub');
 const responder = zmq.socket('rep');
 const readline = require('readline');
-const inquirer = require('inquirer');
+//const inquirer = require('inquirer');
 const net =require('net');
 
 const intervaloNTP = 120; // 120 segundos
@@ -19,11 +19,11 @@ var maxAgeColaMensajes;
 var cantMaxColaMensajes;
 
 // Objetivos del broker: 
-
+/*
 const consola = readline.createInterface({
     input: process.stdin,
     output: process.stdout
-});
+});*/
 
 var id_broker;
 var portRR;
@@ -153,10 +153,10 @@ responder.on('message', (jsonRequest) => {
                 exito: true,
                 accion: request.accion,
                 idPeticion: request.idPeticion,
-                resultados: {}
+                resultados: {},
+                topico:request.to
             };
-            respuesta = JSON.stringify(respuesta);
-            responder.send(respuesta);
+            responder.send(JSON.stringify(respuesta));
 
             break;
     }
@@ -178,7 +178,7 @@ responder.on('message', (jsonRequest) => {
 
 /**
  * Funcion que recorre periodicamente las colas de mensajes para comprobar que no hayan vencido. Si es asi los remueve de la cola
- */
+ 
 setInterval(() => {
     colasMensajes.forEach(colaMensajes => {
         colaMensajes.forEach((mensaje) => {
@@ -220,5 +220,5 @@ clienteNTP.on('data', function (data) {
     delay = ((T2 - T1) + (T4 - T3)) / 2;
     console.log("Delay calculado para broker: " + delay);
 });
-
+*/
 // --------------------- FIN MODULO NTP -------------------------

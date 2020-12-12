@@ -97,7 +97,7 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
             asunto.sub.suscribe(element.topico);
             conexiones_suscripcion.push(asunto);
         });
-        solicitud_Informacion_Coordinador(1, 'heartbeat', id_cliente);
+       // solicitud_Informacion_Coordinador(1, 'heartbeat', id_cliente);
     }
     else { //Si es una respuesta al pedido de datos de un broker para publicacion
         if( response.topico == 'heartbeat'){
