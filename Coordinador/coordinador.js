@@ -10,7 +10,7 @@ var responder = zmq.socket('rep');
 responder.bind('tcp://127.0.0.1:5555');
 requesters=[];
 
-/*
+
 for(let i=0;i<nroBroker;i++)
 {
     requesters[i]=zmq.socket('req');
@@ -87,8 +87,59 @@ function notificarBroker (topico, index, request){
             requester3.send(request);
             break;
     }
-}*/
+}
 
+function consultar_broker (req){
+    let respuesta;
+    i = verificaExistenciaTopico(req.topico);
+    if ( i == -1){ 
+        //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
+        i = eleccionDeBroker(req.topico, req);
+        requester1.on('message', (err, response) =>{
+            let res = response.toString();
+            res = JSON.parse(res);
+            if (res.exito == true){
+                respuesta = {
+                    exito: res.exito,
+                    datosBroker: new Object()
+                };
+                datosBroker.topico = req.topico;
+                datosBroker.ip = listaBrokers[i].ip;
+                if (req.accion == 1) {
+                    datosBroker.puerto = listaBrokers[i].portPUB
+                }
+                else{
+                    datosBroker.puerto = listaBrokers[i].portSUB
+                }
+            }
+            else {
+                respuesta = {
+                    exito: res.exito,
+                    error: {      
+                        codigo: res.codigo,
+                        mensaje: res.mensaje
+                    } 
+                };
+            }
+            return respuesta;
+        });
+    }
+    else{
+        respuesta = {
+            exito: true,
+            datosBroker: new Object()
+        };
+        datosBroker.topico = req.topico;
+        datosBroker.ip = listaBrokers[i].ip;
+        if (req.accion == 1) {
+            datosBroker.puerto = listaBrokers[i].portPUB
+        }
+        else{
+            datosBroker.puerto = listaBrokers[i].portSUB
+        }
+        return respuesta;
+    }
+}
 
 responder.on('message', (request) => {
   let req = request.toString();
@@ -99,9 +150,58 @@ responder.on('message', (request) => {
   let exit = false;
   switch (req.accion) {
         case 1:
+            let consulta = consultar_broker(req);
+            respuesta = new Object();
+            respuesta.exito = consulta.exito;
+            respuesta.accion = req.accion;
+            respuesta.idPeticion = req.idPeticion;
+            if (consulta.exito == 'true'){
+                respuesta.resultados = {datosBroker:[]};
+                respuesta.resultados.datosBroker.push(consulta.datosBroker);
+            }
+            else{
+                respuesta.error = {
+                    codigo: cosulta.error.codigo,
+                    mensaje: consulta.error.mensaje
+                };
+            }      
+            respuesta = JSON.stringify(respuesta);
+            console.log('Respuesta enviada: ', respuesta);
+            responder.send(respuesta);
+            break;
+        case 2:
+            //Cliente le pide al coordinador el puerto e ip de un broker con el topico para PUBLICAR
+            let consulta; 
+            respuesta = new Object();
+            for (let i = 1; i<=3; i++){
+                consulta = consultar_broker(req);
+
+
+               
+            }
+            respuesta.exito = consulta.exito;
+            respuesta.accion = req.accion;
+            respuesta.idPeticion = req.idPeticion;
+            if (consulta.exito == 'true'){
+                respuesta.resultados = {datosBroker:[]};
+                respuesta.resultados.datosBroker.push(consulta.datosBroker);
+            }
+            else{
+                respuesta.error = {
+                    codigo: cosulta.error.codigo,
+                    mensaje: consulta.error.mensaje
+                };
+            }
+            while (respuesta.resultados.datosBroker.length != 3){ //El 3 representa: All, heartbeat y el mismo cliente que solicito
+
+            }
+            respuesta = JSON.stringify(respuesta);
+            console.log('Respuesta enviada: ', respuesta);
+            responder.send(respuesta);
+            break;
             
-            //Cliente le pide al coordinador el puerto e ip de un broker con el topico para PUBLICAR 
-            /*i = verificaExistenciaTopico(req.topico);
+            
+            i = verificaExistenciaTopico(req.topico);
             console.log('i:', i);
             if ( i == -1){ 
                 //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
@@ -144,7 +244,7 @@ responder.on('message', (request) => {
                     responder.send(respuesta);
                 });
             }
-            else{*/
+            else{
                 respuesta = {
                     exito: true,
                     accion: 1,
@@ -153,12 +253,12 @@ responder.on('message', (request) => {
                         datosBroker: [{topico:'heartbeat',ip:'127.0.0.1',puerto:'3011'}]
                     }
                 };
-                /*let datoTop = {
+                let datoTop = {
                     topico: req.topico,
                     ip: listaBrokers[i].ip,
                     puerto: listaBrokers[i].portSUB
                 };
-                respuesta.resultados.datosBroker.push(datoTop);*/
+                respuesta.resultados.datosBroker.push(datoTop);
                 
                 console.log('Respuesta enviada: ', respuesta);
                 respuesta = JSON.stringify(respuesta);
@@ -166,7 +266,7 @@ responder.on('message', (request) => {
                 responder.send(respuesta);
             //} //SE TIENE QUE ENVIAR AQUI POR EL ASINCRONISMO
             break;
-        case 2:
+        /*case 2:
             respuesta = {
                 exito: true,
                 accion: 2,
@@ -194,9 +294,7 @@ responder.on('message', (request) => {
             respuesta = JSON.stringify(respuesta);
             console.log('respuesta enviada: ', respuesta);
             responder.send(respuesta);
-            break;
-        case '3':
-            break;
+            break;*/
         case '4':
             break;
         case '5':
