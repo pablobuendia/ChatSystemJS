@@ -106,7 +106,16 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
                 }
                 else if ((topic == 'heartbeat') && (mensaje.emisior != id_cliente)){
                     //debe actualizar la lista de clientes vivos. 
-                    
+                    let index;
+                    if ((index = lista_clientes_vivos.indexOf(mensaje.emisor)) != -1) {
+                        lista_clientes_vivos[index].fecha = mensaje.fecha;
+                    }
+                    else{
+                        let nuevo_cliente = new Object();
+                        nuevo_cliente.id = mensaje.emisor;
+                        nuevo_cliente.fecha = mensaje.fecha;
+                        lista_clientes_vivos.push(nuevo_cliente);
+                    }
                 }
             });
         });
@@ -138,6 +147,17 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
 /*
 La conexión siguiente se tiene que hacer a partir de la devolución del coordinador a donde se tiene que conectar
 
+
+PREGUNTA: por cada broker al que se quiere conectar debe tener un subSocket y un pubSocket? ---------------------------------- PREGUNTA
+Porque se tiene que conectar a diferentes puertos para recibir mensaje de los distintos topicos
+
+subSocket.on('message', function (topic, message) {
+    let mensaje = message.toString();
+    mensaje = JSON.parse(mensaje);
+    if (mensaje.id_cliente != id_cliente) {
+        console.log('Recibio topico: ', topic.toString(), ' con mensaje: ', mensaje.mensaje);
+    }
+});
 
 
 r1.on('line', (mensaje) => {
