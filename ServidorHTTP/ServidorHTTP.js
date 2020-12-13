@@ -31,7 +31,7 @@ const responseHandler = (request, response) => {
     const pathname = urlParseada.pathname;
     switch (request.method) {
         case 'GET':
-            let idPeticionNueva = handleGetAction(pathname);
+            let idPeticionNueva = handleGetAction(pathname, request.method);
 
             // Si la id es -1 entonces no se encontro el broker
             if (idPeticionNueva === -1) {
@@ -45,16 +45,19 @@ const responseHandler = (request, response) => {
                     respuesta: response
                 })
             }
-            case 'OPTIONS': // Esta request se envia automaticamente por Chrome antes de enviar el DELETE
-                response.writeHead(200, getOptionsHeaders());
-                response.end();
-            case 'DELETE':
-
-            default:
-                response.writeHead(405);
-                response.end(JSON.stringify({
-                    error: "Method not allowed"
-                }));
+            break;
+        case 'OPTIONS': // Esta request se envia automaticamente por Chrome antes de enviar el DELETE
+            response.writeHead(200, getOptionsHeaders());
+            response.end();
+            break;
+        case 'DELETE':
+            break;
+        default:
+            response.writeHead(405);
+            response.end(JSON.stringify({
+                error: "Method not allowed"
+            }));
+            break;
     }
 }
 
@@ -72,7 +75,7 @@ function getOptionsHeaders() {
     return headers;
 }
 
-function handleGetAction(pathname) {
+function handleGetAction(paths, method) {
     let lastPath = paths[paths.length - 1];
     let idBroker = paths[2];
 
@@ -84,20 +87,28 @@ function handleGetAction(pathname) {
         return -1;
     } else {
         idPeticionNueva = generadorIdPeticion++;
-        if (lastPath == "topics") {
-            requester.send({
+        if (lastPath === "topics") {
+            requester.send(JSON.stringify({
                 idPeticion: idPeticionNueva,
-                accion: "listaTopicos",
+                accion: "4",
                 topico: null
-            })
-        } else if (paths.includes("topics")) {
+            }))
+        } else if (paths.includes("topics") && method === "GET") {
             let topic = lastPath;
 
-            requester.send({
+            requester.send(JSON.stringify({
                 idPeticion: idPeticionNueva,
-                accion: "listaMensajes",
+                accion: "5",
                 topico: topic
-            })
+            }))
+        } else if (paths.includes("topics") && method === "DELETE") {
+            let topic = lastPath;
+
+            requester.send(JSON.stringify({
+                idPeticion: idPeticionNueva,
+                accion: "6",
+                topico: topic
+            }))
         }
         return idPeticionNueva;
     }
@@ -114,11 +125,11 @@ function handleGetAction(pathname) {
                          }
 }
 */
-requester.on("message", function (jsonReply) {
+requester.on("message", function (bufferReply) {
     // Se recibio una respuesta del broker
     console.log("Received reply : [", reply.toString(), ']');
 
-    let reply = JSON.parse(jsonReply);
+    let reply = JSON.parse(bufferReply.toString());
 
     if (reply.exito) {
         let responseIndex = listaResponses.findIndex(response => response.idPeticion === reply.idPeticion);
@@ -129,7 +140,7 @@ requester.on("message", function (jsonReply) {
             let response = listaResponses[responseIndex];
 
             response.writeHead(200);
-            response.end(JSON.stringify(jsonReply));
+            response.end(JSON.stringify(bufferReply));
         }
     } else {
         console.log("Hubo un error en la operacion");
