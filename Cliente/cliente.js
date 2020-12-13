@@ -9,10 +9,9 @@ const cantidad_brokers=3;
 
 //var delay;
 var inicio = true;
-var id_cliente; //----------------- IMPORTANTE 
+var id_cliente;  
 var ip_coordinador;
 var port_coordinador;
-var pub_heartbeat = zmq.socket('pub');
 
 var r1 = readline.createInterface({
     input: process.stdin,
@@ -21,13 +20,10 @@ var r1 = readline.createInterface({
 
 var conexiones_suscripcion=[]; //datos del broker a los topicos suscriptos (contiene obj.topico y obj.sub, socket)
 var lista_clientes_vivos = []; // lista de cliente vivos para publicar (contiene obj.topico y obj.pub, socket)
-/*var topico = {
-    topic:undefined,
-    ip:undefined,
-    puerto:undefined
-};*/
+var mensajes_pendientes = [];
 
 var requester = zmq.socket('req');
+var pub_heartbeat = zmq.socket('pub');
 
  
 if(inicio){
@@ -52,10 +48,7 @@ if(inicio){
     });
 };
 
-/*console.log("Ingrese el mensaje a enviar\n")
-r1.on('line',(data) => {
-procesarMensaje(data);
-})*/
+//console.log("Ingrese el mensaje a enviar\n")
 
 
 // Conexion con el Coordinador
@@ -91,7 +84,6 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
             asunto.topico = element.topico;
             asunto.sub = zmq.socket('sub');
             asunto.sub.connect('tcp://' + element.ip + ':' + element.puerto);
-            console.log('ELEMENTO: ', element);
             asunto.sub.subscribe(element.topico.toString());
             conexiones_suscripcion.push(asunto);
         });
@@ -106,24 +98,37 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
                 }
                 else if ((topic == 'heartbeat') && (mensaje.emisior != id_cliente)){
                     //debe actualizar la lista de clientes vivos. 
-                    let index;
-                    if ((index = lista_clientes_vivos.indexOf(mensaje.emisor)) != -1) {
-                        lista_clientes_vivos[index].fecha = mensaje.fecha;
-                    }
-                    else{
+                    let index = 0;
+                    if (lista_clientes_vivos.length == 0){
                         let nuevo_cliente = new Object();
                         nuevo_cliente.id = mensaje.emisor;
                         nuevo_cliente.fecha = mensaje.fecha;
                         lista_clientes_vivos.push(nuevo_cliente);
                     }
+                    else{
+                        while((index<=lista_clientes_vivos.length) && (lista_clientes_vivos[index].id != mensaje.emisor)){
+                            index++;
+                        }
+                        if (index < lista_clientes_vivos.length) { 
+                            lista_clientes_vivos[index].fecha = mensaje.fecha;
+                        }
+                        else{
+                            let nuevo_cliente = new Object();
+                            nuevo_cliente.id = mensaje.emisor;
+                            nuevo_cliente.fecha = mensaje.fecha;
+                            nuevo_cliente.sub = zmq.socket('pub');
+                            nuevo_cliente.conect = false;
+                            lista_clientes_vivos.push(nuevo_cliente);
+                        }
+                    }
                 }
             });
+            console.log('Puede comenzar a escribir');
         });
     }
     else { //Si es una respuesta al pedido de datos de un broker para publicacion
         if( datos_broker[0].topico == 'heartbeat'){
             pub_heartbeat.connect('tcp://' + datos_broker[0].ip + ':' + datos_broker[0].puerto);
-            console.log('tcp://' + datos_broker[0].ip + ':' + datos_broker[0].puerto);
         
             var interval = setInterval(() => {
                 let mensaje = new Object();
@@ -132,15 +137,64 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
                 mensaje = JSON.stringify(mensaje);
                 pub_heartbeat.send(['heartbeat', mensaje]);
             }, 10000);
-            console.log('Puede comenzar a escribir');
         }
         else{ 
             //cuando se pide datos de un topico para publicar que no se heartbeat
+            //Asumimos que el topico por el cual se solicito informacion sobre el broker que lo maneja, ya existe en la lista_clientes_vivos
+            let indice = 0;
+            while ((indice<=lista_clientes_vivos.length) && (lista_clientes_vivos[indice].id != array_mensaje[0])){
+                indice++;
+            }
+            lista_clientes_vivos[indice].sub.connect('tcp://' + datos_broker[0].ip + ':' + datos_broker[0].puerto);
+            lista_clientes_vivos[indice].conect = true;
         }
     }
 });
 
+setInterval(()=>{
 
+}, )
+
+function procesarMensaje (data, callback){
+    let array_mensaje = data.split(":");
+    let index = 0;
+    let mensaje = new Object();
+    mensaje.emisor = id_cliente;
+    mensaje.mensaje = array_mensaje[0];
+    mensaje.fecha = new Date().toISOString();
+    if (array_mensaje[0] == 'All' && lista_clientes_vivos.length == 0){
+        let nuevo_cliente = new Object();
+        nuevo_cliente.id = 'All';
+        nuevo_cliente.fecha = null;
+        nuevo_cliente.sub = zmq.socket('pub');
+        nuevo_cliente.conect = false;
+        lista_clientes_vivos.push(nuevo_cliente);
+        solicitud_Informacion_Coordinador(1, 'All', id_cliente, ()=>{
+
+        });
+    }
+    if (lista_clientes_vivos.length == 0){
+        console.log("No hay ningun cliente vivo\n");
+    }
+    while((index<=lista_clientes_vivos.length) && (lista_clientes_vivos[index].id != array_mensaje[0])){
+        index++;
+    }
+    if (index == lista_clientes_vivos.length){
+        console.log('Ese topico no existe \n');
+    }
+    else{
+        let fecha_topico = new Date(lista_clientes_vivos[index].fecha);
+        let fecha_ahora = new Date();
+        console.log('fecha del topico: ',fecha_topico, '\n fecha ahora: ', fecha_ahora);
+        //if (fecha_topico )
+    }
+}
+
+r1.on('line',(data) => {
+    procesarMensaje(data, ()=>{
+
+    });
+});
 
 
 
