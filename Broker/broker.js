@@ -32,7 +32,7 @@ var id_broker;
 var portRR;
 var portSUB;
 var portPUB;
-var listaTopicos = [];
+var listaTopicos = new Set();
 var intervalo = 120; // 120 segundos
 
 
@@ -74,7 +74,7 @@ function assignPort (idB){
 
 // Redirige todos los mensajes que recibimos
 subSocket.on('message', function (topic, message) {
-    if (listaTopicos.includes(topic.toString())){  
+    //if (listaTopicos.has(topic.toString())){  
         console.log(message.toString() + 'llegooooooo');
         pubSocket.send([topic, message]);
 
@@ -98,14 +98,14 @@ subSocket.on('message', function (topic, message) {
             mensaje : message,
             timestamp: (new Date()).getTime() + maxAgeColaMensajes * 1000
         });
-    } else {
+    /*} else {
         console.log('Llego un topico que no se maneja con este broker ' + topic);
-    }
+    }*/
 });
 
 // Cuando el pubSocket recibe un tópico, subSocket debe subscribirse a él; para eso se utiliza el método send
 pubSocket.on('message', function (topic) {
-    if (!(listaTopicos.includes(topic.toString()))){
+    if (!(listaTopicos.has(topic.toString()))){
         subSocket.send(topic.toString());
     };
 });
@@ -114,14 +114,14 @@ responder.on('message', (bufferRequest) => {
     // Tiene que incluir dentro de su lista el nuevo topico que le envió el coordinador
     let request = JSON.parse(bufferRequest.toString());
     console.log('Llego un mensaje con: ', request);
-
+    let index;
     switch (request.accion) {
         case MOSTRAR_TOPICOS:
             console.log('Lista de topicos a enviar: ', listaTopicos);
             responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {listaTopicos: listaTopicos})));
             break;
         case MOSTRAR_MENSAJES:
-            let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
+            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
             if (index === -1) { // Si no encuentra el index entonces el topico no está en la lista del broker
                 let error = {
                     codigo: 1,
@@ -133,7 +133,7 @@ responder.on('message', (bufferRequest) => {
             }
             break;
         case BORRAR_MENSAJES:
-            let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
+            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
             if (index === -1) { // Si no encuentra el index entonces el topico no está en la lista del broker
                 let error = {
                     codigo: 1,
@@ -146,9 +146,9 @@ responder.on('message', (bufferRequest) => {
             }
             break;
         default:
-            listaTopicos.push(request.topico); //que no agrege dos veces el mismo topico
+            listaTopicos.add(request.topico); //que no agrege dos veces el mismo topico
             console.log('lista de topicos: ', listaTopicos);
-            jsonRespuesta = {
+            let jsonRespuesta = {
                 exito: true,
                 accion: request.accion,
                 idPeticion: request.idPeticion,

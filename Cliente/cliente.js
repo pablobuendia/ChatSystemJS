@@ -12,6 +12,7 @@ var inicio = true;
 var id_cliente;  
 var ip_coordinador;
 var port_coordinador;
+var prueba = ()=>{};
 
 var r1 = readline.createInterface({
     input: process.stdin,
@@ -48,23 +49,6 @@ if(inicio){
     });
 };
 
-//console.log("Ingrese el mensaje a enviar\n")
-
-
-// Conexion con el Coordinador
-/*
-function publicacion(ip,port ,mensaje){
-let msg=JSON.parse(mensaje)
-let j;
-while(j=0&&j<lista_clientes_vivos.length&&!(lista_clientes_vivos[j].ip.toString.equals(ip)&&((lista_clientes_vivos[j].pub.toString.equals(port)))))
- {
-    j++;
-}
-if(j<lista_clientes_vivos.length)
-{
-    lista_clientes_vivos[j].pub.send(mensaje)
-
-}*/
 
 function solicitud_Informacion_Coordinador (accion, topico, id_p){
     let peticion = new Object();
@@ -82,6 +66,7 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
         datos_broker.forEach(element => {
             let asunto = new Object();
             asunto.topico = element.topico;
+            console.log('Suscripto a: ', element.topico);
             asunto.sub = zmq.socket('sub');
             asunto.sub.connect('tcp://' + element.ip + ':' + element.puerto);
             asunto.sub.subscribe(element.topico.toString());
@@ -90,41 +75,30 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
         //console.log(conexiones_suscripcion);
         solicitud_Informacion_Coordinador(1, 'heartbeat', id_cliente);
         conexiones_suscripcion.forEach((element) => { //que lo hace cuando recibe un mensaje de algun topico
+            //console.log('Elemento llegado: ', element);
             element.sub.on('message', (topic, mensaje) => {
                 topic = topic.toString();
-                mensaje = JSON.parse(mensaje);
-                if ((topic != 'heartbeat') && (mensaje.emisior != id_cliente)){
-                    console.log(topic + mensaje);
+                //console.log('ENTRO ACA');
+                if (topic != 'heartbeat'){
+                    console.log("LLEGO MENSAJEEEEEEEE");
                 }
-                else if ((topic == 'heartbeat') && (mensaje.emisior != id_cliente)){
+                mensaje = JSON.parse(mensaje);
+                if ((topic != 'heartbeat') && (mensaje.emisor != id_cliente)){
+                    console.log('Has recibido un mensaje:\n' + mensaje.emisor + ' : '+ mensaje.mensaje);
+                }
+                else if ((topic == 'heartbeat') && (mensaje.emisor != id_cliente)){
                     //debe actualizar la lista de clientes vivos. 
-                    let index = 0;
-                    if (lista_clientes_vivos.length == 0){
-                        let nuevo_cliente = new Object();
-                        nuevo_cliente.id = mensaje.emisor;
-                        nuevo_cliente.fecha = mensaje.fecha;
-                        lista_clientes_vivos.push(nuevo_cliente);
+                    let index = lista_clientes_vivos.findIndex((currentValue) => currentValue.id == mensaje.emisor);
+                    if (index != -1){
+                        lista_clientes_vivos[index].fecha = mensaje.fecha;
                     }
                     else{
-                        while((index<=lista_clientes_vivos.length) && (lista_clientes_vivos[index].id != mensaje.emisor)){
-                            index++;
-                        }
-                        if (index < lista_clientes_vivos.length) { 
-                            lista_clientes_vivos[index].fecha = mensaje.fecha;
-                        }
-                        else{
-                            let nuevo_cliente = new Object();
-                            nuevo_cliente.id = mensaje.emisor;
-                            nuevo_cliente.fecha = mensaje.fecha;
-                            nuevo_cliente.pub = zmq.socket('pub');
-                            nuevo_cliente.conect = false;
-                            lista_clientes_vivos.push(nuevo_cliente);
-                        }
+                        addClienteVivo(mensaje.emisor, mensaje.fecha);
                     }
                 }
             });
-            console.log('Puede comenzar a escribir');
         });
+        console.log('Puede comenzar a escribir');
     }
     else { //Si es una respuesta al pedido de datos de un broker para publicacion
         if( datos_broker[0].topico == 'heartbeat'){
@@ -141,71 +115,80 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
         else{ 
             //cuando se pide datos de un topico para publicar que no se heartbeat
             //Asumimos que el topico por el cual se solicito informacion sobre el broker que lo maneja, ya existe en la lista_clientes_vivos
-            let indice = 0;
-            while ((indice<=lista_clientes_vivos.length) && (lista_clientes_vivos[indice].id != array_mensaje[0])){
-                indice++;
+            //console.log('clientes vivos:', lista_clientes_vivos);
+            console.log('datos broker: ', datos_broker[0]);
+            let indice = lista_clientes_vivos.findIndex((currentValue) => 'message/'+currentValue.id == datos_broker[0].topico);
+            console.log('el indice linea 121: ', indice);
+            if (indice != -1){
+                lista_clientes_vivos[indice].pub.connect('tcp://' + datos_broker[0].ip + ':' + datos_broker[0].puerto);
+                lista_clientes_vivos[indice].conect = true;
+                console.log("Aca me respondio el coordinador\n");
+                prueba();
             }
-            lista_clientes_vivos[indice].pub.connect('tcp://' + datos_broker[0].ip + ':' + datos_broker[0].puerto);
-            lista_clientes_vivos[indice].conect = true;
         }
     }
 });
 
 setInterval(()=>{
-    if (mensajes_pendientes.length != 0){
-        mensajes_pendientes.forEach((element, i) => {
-            if (lista_clientes_vivos[element.index].conect == true){
-                lista_clientes_vivos[element.index].pub.send(element.mensaje);
-                mensajes_pendientes.splice(i, 1);
-            }
-        });
-    }
-}, 15000);
+    let active_clients = lista_clientes_vivos.filter((element) => {
+        let currentDate = new Date().getTime();
+        let elementDate = new Date (element.fecha).getTime();
+        return currentDate - elementDate <= 30000;
+    });
+    lista_clientes_vivos = active_clients;
+}, 30000);
 
-function procesarMensaje (data, callback){
+
+function addClienteVivo (emisor, fecha){
+    let nuevo_cliente = new Object();
+    nuevo_cliente.id = emisor;
+    nuevo_cliente.fecha = fecha;
+    nuevo_cliente.pub = zmq.socket('pub');
+    nuevo_cliente.conect = false;
+    lista_clientes_vivos.push(nuevo_cliente);
+}
+
+
+function procesarMensaje (data){
     let array_mensaje = data.split(":");
-    let index = 0;
+    let index = lista_clientes_vivos.findIndex((currentValue) => currentValue.id==array_mensaje[0]);
     let mensaje = new Object();
     mensaje.emisor = id_cliente;
-    mensaje.mensaje = array_mensaje[0];
+    mensaje.mensaje = array_mensaje[1];
     mensaje.fecha = new Date().toISOString();
     mensaje = JSON.stringify(mensaje);
-    if (array_mensaje[0] == 'All' && lista_clientes_vivos.length == 0){
-        let nuevo_cliente = new Object();
-        nuevo_cliente.id = 'All';
-        nuevo_cliente.fecha = null;
-        nuevo_cliente.pub = zmq.socket('pub');
-        nuevo_cliente.conect = false;
-        lista_clientes_vivos.push(nuevo_cliente);
-        solicitud_Informacion_Coordinador(1, 'All', id_cliente, ()=>{
-            let pendiente = new Object();
-            pendiente.mensaje = mensaje;
-            pendiente.emisor = nuevo_cliente.id;
-            pendiente.index = 0; //solo porque es el primero en sumarse a la lista
-            mensajes_pendientes.push(pendiente);
-        });
-    }
-    if (lista_clientes_vivos.length == 0){
-        console.log("No hay ningun cliente vivo\n");
-    }
-    while((index<=lista_clientes_vivos.length) && (lista_clientes_vivos[index].id != array_mensaje[0])){
-        index++;
-    }
-    if (index == lista_clientes_vivos.length){
-        console.log('Ese topico no existe \n');
+    console.log('El indice es: ', index);
+    console.log('lista clientes vivos: ', lista_clientes_vivos);
+    if (index == -1){
+        if (array_mensaje[0] == 'all'){
+            addClienteVivo('all', null);
+            solicitud_Informacion_Coordinador(1, 'message/all', id_cliente);
+        }
+        else{
+            console.log('Ese topico no existe, por favor vuelva a intentar\n');
+        }
     }
     else{
-        let fecha_topico = new Date(lista_clientes_vivos[index].fecha);
-        let fecha_ahora = new Date();
-        console.log('fecha del topico: ',fecha_topico, '\n fecha ahora: ', fecha_ahora);
-        //if (fecha_topico )
+        if (lista_clientes_vivos[index].conect == false){
+            solicitud_Informacion_Coordinador(1, 'message/'+array_mensaje[0], id_cliente);
+        }
+        else{
+            lista_clientes_vivos[index].pub.send(['message/'+array_mensaje[0], mensaje]);
+        }
     }
+    prueba = function () {
+        console.log("Acaa llegoo", mensaje); 
+        index = lista_clientes_vivos.findIndex((currentValue) => currentValue.id==array_mensaje[0]);
+        console.log('indice 182: ', index);
+        console.log('array mensaje:', ['message/'+array_mensaje[0], mensaje]);
+        lista_clientes_vivos[index].pub.send(['message/'+array_mensaje[0], mensaje]);
+        prueba = null;
+    };
 }
 
 r1.on('line',(data) => {
-    procesarMensaje(data, ()=>{
-
-    });
+    console.log('Aca tomo como una linea: ', data);
+    procesarMensaje(data.trim());
 });
 
 

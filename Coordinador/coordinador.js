@@ -157,7 +157,7 @@ function callAllBroker (req, callback){
     for (let i=0; i<3; i++){
         switch (i){
             case 1:
-                req.topico = 'All';
+                req.topico = 'message/all';
                 console.log('REALIZO EL CAMBIO A ALL\n');
                 break;
             case 2:
@@ -214,6 +214,8 @@ responder.on('message', (request) => {
             callAllBroker(req, (responses) =>{
                 const AllExito = (currentValue) => currentValue.exito == true;
                 respuesta.exito = responses.every(AllExito);
+                console.log('respuestas del broker: ', responses.map((currentValue) => currentValue.exito));
+                console.log('Exito: ', respuesta.exito);
                 if (respuesta.exito){
                     const datosBroker = (currentValue) => currentValue.datosBroker;
                     respuesta.resultados = {
