@@ -118,7 +118,7 @@ responder.on('message', (bufferRequest) => {
     switch (request.accion) {
         case MOSTRAR_TOPICOS:
             console.log('Lista de topicos a enviar: ', listaTopicos);
-            responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {listaTopicos: listaTopicos})));
+            responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {listaTopicos: Array.from(listaTopicos)})));
             break;
         case MOSTRAR_MENSAJES:
             index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
@@ -169,9 +169,10 @@ responder.on('message', (bufferRequest) => {
  * @param {Object} error El objeto con error. Si no es null entonces hubo un error
  */
 function createResponse(accion, idPeticion, resultados, topico, error) {
+    let respuesta;
     if (error) {
         // Si hubo algun error entonces devolver una respuesta con error pero sin campo resultados
-        let respuesta = {
+        respuesta = {
             exito: false,
             accion: accion,
             idPeticion: idPeticion,
@@ -179,7 +180,7 @@ function createResponse(accion, idPeticion, resultados, topico, error) {
         };
     } else {
         // Si no es asi crear una respuesta exitosa
-        let respuesta = {
+        respuesta = {
             exito: true,
             accion: accion,
             idPeticion: idPeticion,

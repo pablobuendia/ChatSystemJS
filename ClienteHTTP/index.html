@@ -53,17 +53,19 @@
 						<!-- Obtener lista de tópicos -->
 							<article id="topicos">
                                 <h2 class="major">Obtener lista de tópicos</h2>
-                                <form action="/broker/123/topics" method="GET">
 									<div class="fields">
 										<div class="field half">
 											<label for="idBrokerTopico">Id del broker</label>
-											<input type="text" id="idBrokerDelete">
+											<input type="text" id="idBroker">
 										</div>
 									</div>
 									<ul class="actions">
 										<li><input type="button" value="Lista de tópicos" onclick="getTopicsListFromBroker()" class="primary" /></li>
 										<li><input type="reset" value="Reset" /></li>
-                                    </ul>
+									</ul>
+									<div>
+										<ul id="topicosList"></ul>
+									</div>
                                 </form>
 							</article>
 
@@ -377,6 +379,7 @@ print 'It took ' + i + ' iterations to sort the deck.';</code></pre>
 			<script src="assets/js/breakpoints.min.js"></script>
 			<script src="assets/js/util.js"></script>
 			<script src="assets/js/main.js"></script>
+			<script src="service.js"></script>
 
 	</body>
 </html>

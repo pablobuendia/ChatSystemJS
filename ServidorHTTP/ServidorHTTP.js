@@ -2,27 +2,50 @@
 const http = require('http');
 const url = require('url');
 const zmq = require('zeromq');
+const fs = require('fs');
 
 const HOST = 'localhost';
 const PORT = 8080;
 const OK = 200;
+const nroBroker = 3;
 
 var generadorIdPeticion = 0;
+var listaBrokers = [];
+var requesters=[];
 
 // Esta es la lista que va a almacenar las responses para responder a las request de los clientes
 var listaResponses = [];
 
-var listaRequesters = [];
+for(let i=0;i<nroBroker;i++)
+{
+    requesters[i]=zmq.socket('req');
+}
 
-// Crear los requesters y almacenarlos en la lista
-for (let index = 1; index < 4; index++) {
-    let requester = zmq.socket('req');
-    requester.connect("tcp://localhost:" + (5554 + index));
+fs.readFile('configuracion.txt', 'utf8', (err, data) => {
+    let file = data.split(',');
+    let i = 0;
+    while(i<file.length){
+        let objeto = {
+            id_broker: file[i], 
+            ip: file[i+1],
+            portRR: file[i+2]
+        };
+        updateListaBrokers(objeto);
+        i = i+3;
+    }
+    let dir;
+    for(let j = 0; j < nroBroker; j++){
+        dir = 'tcp://' +listaBrokers[j].ip + ':' + listaBrokers[j].portRR;
+        console.log('dir: ', dir);
+        requesters[j].connect(dir);
+    }
+    prepareRequesters();
+});
 
-    listaRequesters.push({
-        id: 'broker' + index,
-        socket: requester
-    });
+function updateListaBrokers (obj) {
+    if (listaBrokers.length < 3){
+        listaBrokers.push(obj);
+    }
 }
 
 // Handler para el server
@@ -41,7 +64,7 @@ const responseHandler = (request, response) => {
                 }));
             } else {
                 listaResponses.push({
-                    idPeticion: id,
+                    idPeticion: idPeticionNueva,
                     respuesta: response
                 })
             }
@@ -76,37 +99,38 @@ function getOptionsHeaders() {
 }
 
 function handleGetAction(paths, method) {
-    let lastPath = paths[paths.length - 1];
-    let idBroker = paths[2];
-
+    let splittedPath = paths.split('/');
+    let lastPath = splittedPath[splittedPath.length - 1];
+    let idBroker = splittedPath[2];
+    let idPeticionNueva;
     // Encontrar el requester de acuerdo al codigo del broker
-    let requesterIndex = listaRequesters.findIndex(requester => requester.id = idBroker);
+    let brokerIndex = listaBrokers.findIndex(broker => broker.id = idBroker);
 
-    if (requesterIndex === -1) {
+    if (brokerIndex == -1) {
         console.log("No se encontro un broker con la id buscada, se rechaza la respuesta");
         return -1;
     } else {
         idPeticionNueva = generadorIdPeticion++;
-        if (lastPath === "topics") {
-            requester.send(JSON.stringify({
+        if (lastPath == 'topics') {
+            console.log("Entro en 115");
+            console.log("requester", requesters[brokerIndex]);
+            requesters[brokerIndex].send(JSON.stringify({
                 idPeticion: idPeticionNueva,
-                accion: "4",
+                accion: '4',
                 topico: null
             }))
-        } else if (paths.includes("topics") && method === "GET") {
+        } else if (splittedPath.includes("topics") && method == "GET") {
             let topic = lastPath;
-
-            requester.send(JSON.stringify({
+            requesters[brokerIndex].send(JSON.stringify({
                 idPeticion: idPeticionNueva,
-                accion: "5",
+                accion: '5',
                 topico: topic
             }))
-        } else if (paths.includes("topics") && method === "DELETE") {
+        } else if (splittedPath.includes("topics") && method == "DELETE") {
             let topic = lastPath;
-
-            requester.send(JSON.stringify({
+            requesters[brokerIndex].send(JSON.stringify({
                 idPeticion: idPeticionNueva,
-                accion: "6",
+                accion: '6',
                 topico: topic
             }))
         }
@@ -125,24 +149,30 @@ function handleGetAction(paths, method) {
                          }
 }
 */
-requester.on("message", function (bufferReply) {
-    // Se recibio una respuesta del broker
-    console.log("Received reply : [", reply.toString(), ']');
 
-    let reply = JSON.parse(bufferReply.toString());
+function prepareRequesters() {
+    requesters.forEach((element) => {
+        element.on("message", function (bufferReply) {
+            // Se recibio una respuesta del broker
+            console.log("Received reply : [", bufferReply.toString(), ']');
+        
+            let reply = JSON.parse(bufferReply.toString());
+            if (reply.exito) {
+                let responseIndex = listaResponses.findIndex(response => response.idPeticion === reply.idPeticion);
+        
+                if (responseIndex === -1) {
+                    console.log("No se encontro la respuesta");
+                } else {
+                    let response = listaResponses[responseIndex];
+                    response.respuesta.writeHead(200, getOptionsHeaders());
+                    response.respuesta.end(JSON.stringify(bufferReply.toString()));
+                }
+            } else {
+                console.log("Hubo un error en la operacion");
+            }
+        });
+    });
+}
 
-    if (reply.exito) {
-        let responseIndex = listaResponses.findIndex(response => response.idPeticion === reply.idPeticion);
 
-        if (responseIndex === -1) {
-            console.log("No se encontro la respuesta");
-        } else {
-            let response = listaResponses[responseIndex];
 
-            response.writeHead(200);
-            response.end(JSON.stringify(bufferReply));
-        }
-    } else {
-        console.log("Hubo un error en la operacion");
-    }
-});

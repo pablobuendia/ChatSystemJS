@@ -3,7 +3,8 @@ const OK = "200";
 const URL = 'http://localhost:8080';
 
 function displayTopicsList(topics) {
-    var topicosElement = getElementById("topicos");
+    console.log("Aqui van", topics);
+    var topicosElement = document.getElementById("topicosList");
     topicosElement.innerHTML = "";
 
     for(i = 0; i < topics.length; i++) {
@@ -15,17 +16,32 @@ function displayTopicsList(topics) {
 
 function getTopicsListFromBroker() {
     var xmlHttp = new XMLHttpRequest();
+    xmlHttp.overrideMimeType("application/json");
     let idBroker = getElementById("idBroker");
-    xmlHttp.onreadystatechange = function() { 
+    xmlHttp.open("GET", `${URL}/broker/${idBroker}/topics`, true);
+    xmlHttp.onload = function() {
+        let asd = new Object();
+        asd.pepe = "amiguito";
+        console.log(asd);
+
+        let response = JSON.parse(xmlHttp.responseText);
+        console.log('Respuesta', response);
+        console.log('respuesta', response.accion);
+    }
+
+    /*xmlHttp.onreadystatechange = function() { 
         if (this.readyState == 4 && xmlHttp.status == OK) {
-            let topicsArray = JSON.parse(xmlHttp.responseText);
+            let response = JSON.parse(xmlHttp.responseText);
+            console.log('Respuesta', response);
+            console.log('respuesta', response.exito);
+            let topicsArray = response[0].resultados.listaTopicos;
             displayTopicsList(topicsArray);
         } 
         else {
             alert("Error al obtener la lista de topicos");
         }  
-    }
-    xmlHttp.open("GET", `${URL}/broker/${idBroker}/topics`, true);
+    }*/
+    
     xmlHttp.send();
 }
 
