@@ -5,6 +5,9 @@ const subSocket = zmq.socket('xsub');
 const pubSocket = zmq.socket('xpub');
 const responder = zmq.socket('rep');
 const readline = require('readline');
+const MOSTRAR_TOPICOS = '4';
+const MOSTRAR_MENSAJES = '5';
+const BORRAR_MENSAJES = '6';
 //const inquirer = require('inquirer');
 const net =require('net');
 
@@ -107,65 +110,84 @@ pubSocket.on('message', function (topic) {
     };
 });
 
-responder.on('message', (jsonRequest) => {
+responder.on('message', (bufferRequest) => {
     // Tiene que incluir dentro de su lista el nuevo topico que le envió el coordinador
-    let request = JSON.parse(jsonRequest);
+    let request = JSON.parse(bufferRequest.toString());
     console.log('Llego un mensaje con: ', request);
 
-    let respuesta;
     switch (request.accion) {
-        case "listaTopicos":
-            console.log('lista de topicos: ', listaTopicos);
-            respuesta = {
-                exito: true,
-                accion: request.accion,
-                idPeticion: request.idPeticion,
-                resultados: {
-                    listaTopicos : listaTopicos
-                }
-            };
-            respuesta = JSON.stringify(respuesta);
-            responder.send(respuesta);
+        case MOSTRAR_TOPICOS:
+            console.log('Lista de topicos a enviar: ', listaTopicos);
+            responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {listaTopicos: listaTopicos})));
             break;
-        case "listaMensajes":
-            let colaMensajes = colasMensajes[colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico)]
-
-            respuesta = {
-                exito: true,
-                accion: request.accion,
-                idPeticion: request.idPeticion,
-                resultados: {
-                    mensajes : colaMensajes.mensajes
+        case MOSTRAR_MENSAJES:
+            let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
+            if (index === -1) { // Si no encuentra el index entonces el topico no está en la lista del broker
+                let error = {
+                    codigo: 1,
+                    mensajes: "Tópico inexistente"
                 }
-            };
-            respuesta = JSON.stringify(respuesta);
-            responder.send(respuesta);
+                responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, null, error)));
+            } else {
+                responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {mensajes: colasMensajes[i]})));
+            }
             break;
-        case "limpiarColaMensajes":
-            colasMensajes.filter(colaMensajes => colaMensajes.topico !== request.topico)
-            respuesta = {
-                exito: true,
-                accion: request.accion,
-                idPeticion: request.idPeticion,
-                resultados: {}
-            };
+        case BORRAR_MENSAJES:
+            let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
+            if (index === -1) { // Si no encuentra el index entonces el topico no está en la lista del broker
+                let error = {
+                    codigo: 1,
+                    mensajes: "Tópico inexistente"
+                }
+                responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, null, error)));
+            } else {
+                colasMensajes = colasMensajes.filter(colaMensajes => colaMensajes.topico !== request.topico); // Filtra la cola a borrar, efectvamente borrandola
+                responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {})));
+            }
             break;
         default:
             listaTopicos.push(request.topico); //que no agrege dos veces el mismo topico
             console.log('lista de topicos: ', listaTopicos);
-            respuesta = {
+            jsonRespuesta = {
                 exito: true,
                 accion: request.accion,
                 idPeticion: request.idPeticion,
                 resultados: {},
                 topico:request.topico
             };
-            responder.send(JSON.stringify(respuesta));
+            responder.send(JSON.stringify(jsonRespuesta));
 
             break;
     }
 })
 
+/**
+ * Arma la response para devolver una respuesta a la request que llego al coordinador
+ * @param {String} accion La acción solicitada en la request
+ * @param {String} idPeticion El id de petición de la request
+ * @param {Object} resultados El objeto de resultados
+ * @param {Object} error El objeto con error. Si no es null entonces hubo un error
+ */
+function createResponse(accion, idPeticion, resultados, topico, error) {
+    if (error) {
+        // Si hubo algun error entonces devolver una respuesta con error pero sin campo resultados
+        let respuesta = {
+            exito: false,
+            accion: accion,
+            idPeticion: idPeticion,
+            error: error
+        };
+    } else {
+        // Si no es asi crear una respuesta exitosa
+        let respuesta = {
+            exito: true,
+            accion: accion,
+            idPeticion: idPeticion,
+            resultados: resultados
+        };
+    }
+    return respuesta;
+}
 
 /*
 {
