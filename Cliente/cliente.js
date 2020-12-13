@@ -116,7 +116,7 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
                             let nuevo_cliente = new Object();
                             nuevo_cliente.id = mensaje.emisor;
                             nuevo_cliente.fecha = mensaje.fecha;
-                            nuevo_cliente.sub = zmq.socket('pub');
+                            nuevo_cliente.pub = zmq.socket('pub');
                             nuevo_cliente.conect = false;
                             lista_clientes_vivos.push(nuevo_cliente);
                         }
@@ -145,15 +145,22 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
             while ((indice<=lista_clientes_vivos.length) && (lista_clientes_vivos[indice].id != array_mensaje[0])){
                 indice++;
             }
-            lista_clientes_vivos[indice].sub.connect('tcp://' + datos_broker[0].ip + ':' + datos_broker[0].puerto);
+            lista_clientes_vivos[indice].pub.connect('tcp://' + datos_broker[0].ip + ':' + datos_broker[0].puerto);
             lista_clientes_vivos[indice].conect = true;
         }
     }
 });
 
 setInterval(()=>{
-
-}, )
+    if (mensajes_pendientes.length != 0){
+        mensajes_pendientes.forEach((element, i) => {
+            if (lista_clientes_vivos[element.index].conect == true){
+                lista_clientes_vivos[element.index].pub.send(element.mensaje);
+                mensajes_pendientes.splice(i, 1);
+            }
+        });
+    }
+}, 15000);
 
 function procesarMensaje (data, callback){
     let array_mensaje = data.split(":");
@@ -162,15 +169,20 @@ function procesarMensaje (data, callback){
     mensaje.emisor = id_cliente;
     mensaje.mensaje = array_mensaje[0];
     mensaje.fecha = new Date().toISOString();
+    mensaje = JSON.stringify(mensaje);
     if (array_mensaje[0] == 'All' && lista_clientes_vivos.length == 0){
         let nuevo_cliente = new Object();
         nuevo_cliente.id = 'All';
         nuevo_cliente.fecha = null;
-        nuevo_cliente.sub = zmq.socket('pub');
+        nuevo_cliente.pub = zmq.socket('pub');
         nuevo_cliente.conect = false;
         lista_clientes_vivos.push(nuevo_cliente);
         solicitud_Informacion_Coordinador(1, 'All', id_cliente, ()=>{
-
+            let pendiente = new Object();
+            pendiente.mensaje = mensaje;
+            pendiente.emisor = nuevo_cliente.id;
+            pendiente.index = 0; //solo porque es el primero en sumarse a la lista
+            mensajes_pendientes.push(pendiente);
         });
     }
     if (lista_clientes_vivos.length == 0){
