@@ -59,14 +59,22 @@
 											<input type="text" id="idBroker">
 										</div>
 									</div>
+									<br>
 									<ul class="actions">
-										<li><input type="button" value="Lista de tópicos" onclick="getTopicsListFromBroker()" class="primary" /></li>
-										<li><input type="reset" value="Reset" /></li>
+										<li><input type="button" value="Lista de tópicos" onclick="getTopicsListFromBroker()" class="primary" />
+										</li>
 									</ul>
-									<div>
-										<ul id="topicosList"></ul>
+									<div class="table-wrapper">
+										<table id="tablaTopicos">
+											<thead>
+												<tr>
+													<th>LOS TÓPICOS</th>
+												</tr>
+											</thead>
+											<tbody>
+											</tbody>
+										</table>
 									</div>
-                                </form>
 							</article>
 
 						<!-- Obtener cola de mensajes para un tópico -->
@@ -108,6 +116,7 @@
 										<li><input type="button" value="Borrar" onclick="deleteTopic()" class="primary" /></li>
 										<li><input type="reset" value="Reset" /></li>
 									</ul>
+									<div id="mensajeBorrado"></div>
                                 </form>
 
 								</form>

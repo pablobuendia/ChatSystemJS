@@ -1,60 +1,38 @@
 const OK = "200";
-
 const URL = 'http://localhost:8080';
-
-function displayTopicsList(topics) {
-    console.log("Aqui van", topics);
-    var topicosElement = document.getElementById("topicosList");
-    topicosElement.innerHTML = "";
-
-    for(i = 0; i < topics.length; i++) {
-        var li = document.createElement("LI");
-        li.innerHTML = topics[i];
-        topicosElement.appendChild(li);
-    }
-}
 
 function getTopicsListFromBroker() {
     var xmlHttp = new XMLHttpRequest();
     xmlHttp.overrideMimeType("application/json");
     let idBroker = getElementById("idBroker");
-    xmlHttp.open("GET", `${URL}/broker/${idBroker}/topics`, true);
-    xmlHttp.onload = function() {
-        let asd = new Object();
-        asd.pepe = "amiguito";
-        console.log(asd);
 
-        let response = JSON.parse(xmlHttp.responseText);
-        console.log('Respuesta', response);
-        console.log('respuesta', response.accion);
-    }
-
-    /*xmlHttp.onreadystatechange = function() { 
+    xmlHttp.onreadystatechange = function () {
         if (this.readyState == 4 && xmlHttp.status == OK) {
             let response = JSON.parse(xmlHttp.responseText);
-            console.log('Respuesta', response);
-            console.log('respuesta', response.exito);
-            let topicsArray = response[0].resultados.listaTopicos;
-            displayTopicsList(topicsArray);
-        } 
-        else {
-            alert("Error al obtener la lista de topicos");
-        }  
-    }*/
+            console.log('Respuesta del servidor: ', response);
+            let topicsArray = response.resultados.listaTopicos;
+            displayTopicsList('tablaTopicos',topicsArray);
+        } else if (xmlHttp.status.startsWith("4")) {
+            displayText("mensajeBorrado", "Error al obtener la lista de topicos:" + xmlHttp.response + ". Status: " + xmlHttp.status + ". Readystate: " + this.readyState);
+        }
+    }
     
+    xmlHttp.open("GET", `${URL}/broker/${idBroker}/topics`, true);
     xmlHttp.send();
 }
 
 function deleteTopic() {
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.overrideMimeType("application/json");
+
     let topicToDelete = getElementById("borrarTopico");
     let idBroker = getElementById("idBrokerDelete");
-    var xmlHttp = new XMLHttpRequest();
+    
     xmlHttp.onreadystatechange = function() {
         if (this.readyState == 4 && xmlHttp.status == OK) {
-            alert("Topico borrado correctamente");
-        } 
-        else {
-            alert("Error al borrar el topico "+ topicToDelete);
+            displayText("mensajeBorrado", "Topico borrado correctamente");
+        } else if (xmlHttp.status.startsWith("4")) {
+            displayText("mensajeBorrado", "Error al borrar el topico: " + topicToDelete + ". Response: " + xmlHttp.response + ". Status: " + xmlHttp.status + ". Readystate: " + this.readyState);
         } 
     }
     xmlHttp.open("DELETE", `${URL}/broker/${idBroker}/topics/${topicToDelete}`, true);
@@ -74,8 +52,8 @@ function getMessageListFromTopic() {
             let messagesArray = JSON.parse(xmlHttp.responseText);
             displayMessagesFromTopic(messagesArray);
         } 
-        else {
-            alert("Error al obtener los mensajes del topico "+ topico);
+        else if (xmlHttp.status.startsWith("4")) {
+            displayText("mensajeBorrado", "Error al obtener los mensajes del topico " + topico);
         }  
     }
     xmlHttp.open("GET", `${URL}/broker/${idBroker}/topics/${topico}`, true);
@@ -84,4 +62,30 @@ function getMessageListFromTopic() {
 
 function getElementById(id) {
     return document.getElementById(id).value;
+}
+
+/**
+ * Ingresa el texto dentro del div
+ * @param {String} idDiv el id del div
+ * @param {String[]} text El texto a ingresar
+ */
+function displayText(idDiv, text) {
+    var divElement = document.getElementById(idDiv);
+    divElement.innerHTML = text;
+}
+
+/**
+ * Ingresa el array de elementos en la tabla
+ * @param {String} idTabla el id de la tabla en donde insertar el array
+ * @param {String[]} elements La lista de mensajes a ingresar
+ */
+function displayTopicsList(idTabla, elements) {
+    var tbodyRef = document.getElementById(idTabla).getElementsByTagName('tbody')[0];
+    tbodyRef.innerHTML = "";
+    for(i = 0; i < elements.length; i++) {
+        var newRow = tbodyRef.insertRow();
+        var newCell = newRow.insertCell();
+        var newText = document.createTextNode(elements[i]);
+        newCell.appendChild(newText);
+    }
 }

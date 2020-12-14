@@ -17,4 +17,6 @@ var server = net.createServer(function (socket) {
 
 });
 
-server.listen(port);
+server.listen(port, () => {
+  console.log("Servidor NTP escuchando en puerto:" , port);
+});
