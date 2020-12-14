@@ -24,6 +24,7 @@ var id_cliente;
 var ip_coordinador;
 var port_coordinador;
 var prueba = () => {};
+var idPeticion = 0;
 
 var messagesReceived = [];
 
@@ -35,6 +36,7 @@ var r1 = readline.createInterface({
 var conexiones_suscripcion=[]; //datos del broker a los topicos suscriptos (contiene obj.topico y obj.sub, socket)
 var lista_clientes_vivos = []; // lista de cliente vivos para publicar (contiene obj.topico y obj.pub, socket)
 var mensajes_pendientes = [];
+var lista_brokers_rr = []; //lista de requesters a broker
 
 
 var requester = zmq.socket(REQ);
@@ -56,7 +58,7 @@ if(inicio){
                 port_coordinador = file[1];
                 let dir = createURlWith(ip_coordinador, port_coordinador);
                 requester.connect(dir);
-                solicitud_Informacion_Coordinador(2, MESSAGE+id_cliente, id_cliente);
+                solicitud_Informacion_Coordinador(2, MESSAGE+id_cliente, idPeticion++);
             }
         });
         console.log("Espere por favor, conectando ... \n");
@@ -86,7 +88,7 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
             asunto.sub.subscribe(element.topico.toString());
             conexiones_suscripcion.push(asunto);
         });
-        solicitud_Informacion_Coordinador(1, HEARTBEAT, id_cliente);
+        solicitud_Informacion_Coordinador(1, HEARTBEAT, idPeticion++);
         conexiones_suscripcion.forEach((element) => { //que lo hace cuando recibe un mensaje de algun topico
             element.sub.on('message', (topic, mensaje) => {
                 topic = topic.toString();
@@ -104,9 +106,11 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
                 }
             });
         });
+        solicitud_Informacion_Coordinador(7, MESSAGE+ALL, idPeticion++); //si ya sabe cual es el puerto RR
+        solicitud_Informacion_Coordinador(7, MESSAGE+id_cliente, idPeticion++);
         console.log('Puede comenzar a escribir');
     }
-    else { //Si es una respuesta al pedido de datos de un broker para publicacion
+    else if (response.accion == 1){ //Si es una respuesta al pedido de datos de un broker para publicacion
         if( datos_broker[0].topico == HEARTBEAT){
             pub_heartbeat.connect(createURlWith(datos_broker[0].ip, datos_broker[0].puerto));
             createHeartbeatInterval();
@@ -122,12 +126,56 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
             }
         }
     }
+    else{ //llego respuesta del puerto request/reply
+        if (response.exito == true){
+            //console.log('respuesta del coordinador sobre los puertos RR: ', response.resultados);
+            let obj = new Object();
+            obj.req = zmq.socket('req');
+            obj.topicos = [];
+            obj.topicos.push(datos_broker[0].topico);
+            lista_brokers_rr.push(obj);
+            let i = lista_brokers_rr.findIndex((value) => value.topicos.includes(datos_broker[0].topico));
+            //console.log('index encontrado en lista_broker_rr: ', i);
+            if (i != -1){
+                lista_brokers_rr[i].req.connect(createURlWith(datos_broker[0].ip, datos_broker[0].puerto));
+                let peticion = new Object();
+                peticion.accion = response.accion;
+                peticion.idPeticion = idPeticion++;
+                peticion.topico = datos_broker[0].topico;
+                lista_brokers_rr[i].req.send(JSON.stringify(peticion));
+                lista_brokers_rr.forEach((element) => {
+                    //console.log(element);
+                    element.req.on('message', (response) => {
+                        let respuesta_broker_rr = JSON.parse(response);
+                        //console.log('respuesta del broker RR: ', respuesta_broker_rr);
+                        if (respuesta_broker_rr.exito == true){
+                            let colaMensajes = respuesta_broker_rr.resultados.colaMensajes; //array de objetos tipo: {emisor, mensaje, fecha}
+                            //console.log('Cola entera: ', colaMensajes.emisor,' : ', colaMensajes.mensaje);
+                            console.log("Hubo mensajes enviados anteriormente: \n");
+                            colaMensajes.forEach((element) => {
+                                let leer = JSON.parse(element)
+                                console.log('Emisor: ', leer.emisor, ' : ', leer.mensaje);
+                            });
+                        }
+                        else{
+                            //console.log('No se encontraron mensajes anteriores de ese topico, \nerror: ', respuesta_broker_rr.error.codigo, '\n descripcion: ', respuesta_broker_rr.error.mensaje)
+                        }
+                    })
+                })
+            }
+        }
+        else{
+            console.log('No se pudo consultar las colas de mensaje del topico');
+        }
+    }
 });
 
+
+
 function heartbeatReceived(mensaje) {
-    console.log(mensaje.emisor);
-    console.log("Se recibio la cola de mensajes ", mensaje);
-    displayMessagesNotWatched(mensaje.colaMensajes);
+    //console.log(mensaje.emisor);
+    //console.log("Se recibio la cola de mensajes ", mensaje);
+    //displayMessagesNotWatched(mensaje.colaMensajes);
 
     let index = lista_clientes_vivos.findIndex((currentValue) => currentValue.id == mensaje.emisor);
     if (index != -1){
@@ -136,7 +184,7 @@ function heartbeatReceived(mensaje) {
         addClienteVivo(mensaje.emisor, mensaje.fecha);
     }
 }
-
+/*
 function displayMessagesNotWatched(colaMensajes) {
     let messagesNotPreviouslyDisplayed = colaMensajes.filter(function(currentValue) {
         let emisor = currentValue.mensaje.emisor;
@@ -144,7 +192,7 @@ function displayMessagesNotWatched(colaMensajes) {
         return messagesReceivedForCurrentEmisor.findIndex((value) => currentValue.mensaje.mensaje == value.mensaje) == -1;
     });
     console.log("Mensajes no mostrados anteriormente: \n", messagesNotPreviouslyDisplayed);
-}
+}*/
 
 
 function createHeartbeatInterval() {
@@ -216,7 +264,9 @@ function procesarMensaje (data){
     prueba = function () {
         setTimeout(function(){
             index = lista_clientes_vivos.findIndex((currentValue) => currentValue.id==array_mensaje[0]);
-            lista_clientes_vivos[index].pub.send([MESSAGE+array_mensaje[0], mensaje]);
+            if (index != -1){
+                lista_clientes_vivos[index].pub.send([MESSAGE+array_mensaje[0], mensaje]);
+            }
             prueba = null;
         }, 2000);
     };
@@ -259,7 +309,7 @@ Se espera que el mensaje ingresado para ser enviado contenga el topico
 Ejemplo:
     All: hola
     id_cliente: hola
-*/
+*//*
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     console.log("Cliente comienza a sincronizarse con el servidor NTP");
     setInterval(() => {
@@ -290,4 +340,4 @@ clienteNTP.on('data', function (data) {
     delay = ((T2 - T1) + (T3 - T4)) / 2;
 
     console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
-});
+});*/

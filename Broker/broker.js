@@ -8,6 +8,7 @@ const readline = require('readline');
 const MOSTRAR_TOPICOS = '4';
 const MOSTRAR_MENSAJES = '5';
 const BORRAR_MENSAJES = '6';
+const NUEVO_SUSCRIPTOR = 7;
 //const inquirer = require('inquirer');
 const net =require('net');
 
@@ -20,13 +21,6 @@ const direccionTCP = 'tcp://127.0.0.1:';
 const colasMensajes = [];
 var maxAgeColaMensajes;
 var cantMaxColaMensajes;
-
-// Objetivos del broker: 
-/*
-const consola = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});*/
 
 var id_broker;
 var portRR;
@@ -73,37 +67,42 @@ function assignPort (idB){
         pubSocket.bindSync(portPUB);
         portRR = direccionTCP.concat(file[i+3]);
         responder.bind(portRR);
-        console.log('Puertos:\n PUB: '+portPUB+'\n portSUB: '+portSUB+'\n portRR: '+portRR);
     });
 }
 
 
 // Redirige todos los mensajes que recibimos
+/*
+message = {
+    emisor, mensaje, fecha
+}
+*/
 subSocket.on('message', function (topic, message) {
         console.log(message.toString() + 'llegooooooo');
         pubSocket.send([topic, message]);
 
         // Meter mensaje en la cola
 
-        let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico == topic);
+        let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico == topic.toString());
 
-        let colaMensajes
-
+        let colaMensajes;
+        console.log('INDICE: ', index, 'TOPCO: ', topic);
         if (index == -1) {
             colaMensajes = {topico : topic, mensajes : []}
-            colasMensajes.push(colaMensajes)
+            colasMensajes.push(colaMensajes);
         } else {
-            colaMensajes = colasMensajes[index]
+            colaMensajes = colasMensajes[index];
         }
 
         if (colaMensajes.length > cantMaxColaMensajes) {
-            colaMensajes.unshift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
+            colaMensajes.shift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
         }
-            if (colaMensajes != undefined) {
-        colaMensajes.mensajes.push({
-            mensaje : message,
-            timestamp: (new Date()).getTime() + maxAgeColaMensajes * 1000
-        });
+        if (colaMensajes != undefined) {
+            colaMensajes.mensajes.push({
+                mensaje : message,
+                timestamp: (new Date()).getTime() + maxAgeColaMensajes * 1000
+            });
+        }
 });
 
 // Cuando el pubSocket recibe un tópico, subSocket debe subscribirse a él; para eso se utiliza el método send
@@ -118,6 +117,7 @@ responder.on('message', (bufferRequest) => {
     let request = JSON.parse(bufferRequest.toString());
     console.log('Llego un mensaje con: ', request);
     let index;
+    let jsonRespuesta;
     switch (request.accion) {
         case MOSTRAR_TOPICOS:
             console.log('Lista de topicos a enviar: ', listaTopicos);
@@ -148,10 +148,46 @@ responder.on('message', (bufferRequest) => {
                 responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {})));
             }
             break;
+        case NUEVO_SUSCRIPTOR: //me avisa que hay un nuevo suscriptor a quien mandarle la cola de mensajes
+            console.log('Entro aca, broker linea: 164');
+            jsonRespuesta;
+            index =colasMensajes.findIndex((value) => value.topico == request.topico);
+            if (index != -1){
+                console.log('estoy aqui por RR, la cola de mensajes es: ', colasMensajes[index].mensajes[0].mensaje.toString());
+                jsonRespuesta = {
+                    exito: true,
+                    accion: request.accion,
+                    idPeticion: request.idPeticion,
+                    resultados: {colaMensajes: []}, //cola de mensajes
+                    topico:request.topico
+                };
+                colasMensajes[index].mensajes.forEach((element) => {
+                    console.log('quiero escribir en la cola de mensajes: ',element.mensaje.toString());
+                    jsonRespuesta.resultados.colaMensajes.push(element.mensaje.toString());
+                });
+                console.log('respuesta a enviar como RR: ', jsonRespuesta.resultados.colaMensajes.toString());
+            }
+            else{
+                console.log('no se encontro mensajes en la cola de ese topico');
+                jsonRespuesta = {
+                    exito: false,
+                    accion: request.accion,
+                    idPeticion: request.idPeticion,
+                    error: {
+                        codigo: 1,
+                        mensaje: 'Topico inexistente'
+                    }
+                }
+            }
+            responder.send(JSON.stringify(jsonRespuesta));
+            break;
         default:
-            listaTopicos.add(request.topico); //que no agrege dos veces el mismo topico
-            console.log('lista de topicos: ', listaTopicos);
-            let jsonRespuesta = {
+            if (!(listaTopicos.has(request.topico))){
+                listaTopicos.add(request.topico); //que no agrege dos veces el mismo topico
+            }
+            
+            console.log('LINEA: 180, lista de topicos: ', listaTopicos);
+            jsonRespuesta = {
                 exito: true,
                 accion: request.accion,
                 idPeticion: request.idPeticion,
@@ -171,6 +207,7 @@ responder.on('message', (bufferRequest) => {
  * @param {Object} resultados El objeto de resultados
  * @param {Object} error El objeto con error. Si no es null entonces hubo un error
  */
+
 function createResponse(accion, idPeticion, resultados, topico, error) {
     let respuesta;
     if (error) {
