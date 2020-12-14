@@ -23,7 +23,9 @@ var inicio = true;
 var id_cliente;  
 var ip_coordinador;
 var port_coordinador;
-var prueba = ()=>{};
+var prueba = () => {};
+
+var messagesReceived = [];
 
 var r1 = readline.createInterface({
     input: process.stdin,
@@ -91,6 +93,10 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
                 mensaje = JSON.parse(mensaje);
                 if (!isMe(mensaje.emisor)) {
                     if (topic != HEARTBEAT) {
+                        messagesReceived.push( {
+                            emisor: mensaje.emisor,
+                            mensaje: mensaje.mensaje
+                        });
                         console.log('Has recibido un mensaje:\n' + mensaje.emisor + ' : '+ mensaje.mensaje);
                     } else {
                         heartbeatReceived(mensaje);
@@ -119,6 +125,10 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
 });
 
 function heartbeatReceived(mensaje) {
+    console.log(mensaje.emisor);
+    console.log("Se recibio la cola de mensajes ", mensaje);
+    displayMessagesNotWatched(mensaje.colaMensajes);
+
     let index = lista_clientes_vivos.findIndex((currentValue) => currentValue.id == mensaje.emisor);
     if (index != -1){
         lista_clientes_vivos[index].fecha = mensaje.fecha;
@@ -126,6 +136,16 @@ function heartbeatReceived(mensaje) {
         addClienteVivo(mensaje.emisor, mensaje.fecha);
     }
 }
+
+function displayMessagesNotWatched(colaMensajes) {
+    let messagesNotPreviouslyDisplayed = colaMensajes.filter(function(currentValue) {
+        let emisor = currentValue.mensaje.emisor;
+        let messagesReceivedForCurrentEmisor = messagesReceived.filter((element) => element.emisor == emisor);
+        return messagesReceivedForCurrentEmisor.findIndex((value) => currentValue.mensaje.mensaje == value.mensaje) == -1;
+    });
+    console.log("Mensajes no mostrados anteriormente: \n", messagesNotPreviouslyDisplayed);
+}
+
 
 function createHeartbeatInterval() {
     var interval = setInterval(() => {
