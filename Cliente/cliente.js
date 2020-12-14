@@ -2,13 +2,14 @@
 
 const readline = require('readline');
 const fs = require('fs');
+const net = require('net');
 const zmq = require('zeromq');
 
 
 
 
 // Consts sections
-const intervalo = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
+const intervaloNTP = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
 const puertoNTP = 4444;
 const cantidad_brokers=3;
 const REQ = 'req';
@@ -238,33 +239,35 @@ Se espera que el mensaje ingresado para ser enviado contenga el topico
 Ejemplo:
     All: hola
     id_cliente: hola
-*//*
+*/
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
+    console.log("Cliente comienza a sincronizarse con el servidor NTP");
     setInterval(() => {
 
-        var T1 = (new Date()).getTime().toISOString();
-        console.log("Escribiendo desde cliente " + id_cliente + "...")
+        var T1 = (new Date(Date.now())).toISOString();
+        console.log("Escribiendo desde cliente " + id_cliente + "..." + T1)
         clienteNTP.write(JSON.stringify({
             t1: T1
         }));
 
-    }, intervalo * 1000);
+    }, intervaloNTP * 1000);
 });
 
 
 clienteNTP.on('data', function (data) {
     console.log("Cliente " + id_cliente + " Se recibio respuesta de servidor NTP.")
 
-    var T4 = (new Date()).getTime();
+    // tiempo de arribo del mensaje del servidor
+    var T4 = (new Date(Date.now())).getTime();
 
     // Obtenemos la hora del servidor
     var times = JSON.parse(data);
-    var T1 = (new Date(times.t1)).getTime();
-    var T2 = (new Date(times.t2)).getTime();
-    var T3 = (new Date(times.t3)).getTime();
+    var T1 = (new Date(times.t1)).getTime(); // Tiempo de envio
+    var T2 = (new Date(times.t2)).getTime(); // Tiempo en el que se recibio en el servidor
+    var T3 = (new Date(times.t3)).getTime(); // Tiempo en el que la respuesta se envio
 
     // calculamos delay de la red
-    delay = ((T2 - T1) + (T4 - T3)) / 2;
+    delay = ((T2 - T1) + (T3 - T4)) / 2;
 
     console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
-});*/
+});
