@@ -44,7 +44,13 @@ var rl = readline.createInterface({
 
 rl.question('\n Ingresa el id del broker (puede ser 1, 2 o 3) \n', (idBroker) =>{
     assignPort(idBroker);
-    rl.close();
+    rl.question('\n Ingrese cantidad maxima de mensajes en la cola de mensajes \n', (cantMaxMensajes) => {
+        cantMaxColaMensajes = cantMaxMensajes;
+        rl.question('\n Ingrese la cantidad de segundos maximos de permanencia en la cola de mensajes \n', (maxSegundos) => {
+            maxAgeColaMensajes = maxSegundos;
+            rl.close();
+        });
+    });
 });
 
 function assignPort (idB){
@@ -74,17 +80,16 @@ function assignPort (idB){
 
 // Redirige todos los mensajes que recibimos
 subSocket.on('message', function (topic, message) {
-    //if (listaTopicos.has(topic.toString())){  
         console.log(message.toString() + 'llegooooooo');
         pubSocket.send([topic, message]);
 
         // Meter mensaje en la cola
 
-        let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === topic);
+        let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico == topic);
 
         let colaMensajes
 
-        if (index === -1) {
+        if (index == -1) {
             colaMensajes = {topico : topic, mensajes : []}
             colasMensajes.push(colaMensajes)
         } else {
@@ -94,13 +99,11 @@ subSocket.on('message', function (topic, message) {
         if (colaMensajes.length > cantMaxColaMensajes) {
             colaMensajes.unshift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
         }
+            if (colaMensajes != undefined) {
         colaMensajes.mensajes.push({
             mensaje : message,
             timestamp: (new Date()).getTime() + maxAgeColaMensajes * 1000
         });
-    /*} else {
-        console.log('Llego un topico que no se maneja con este broker ' + topic);
-    }*/
 });
 
 // Cuando el pubSocket recibe un tópico, subSocket debe subscribirse a él; para eso se utiliza el método send
