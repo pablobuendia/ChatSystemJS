@@ -26,8 +26,8 @@ var port_coordinador;
 var prueba = () => {};
 var idPeticion = 0;
 var delay = 0;
-
 var messagesReceived = [];
+var gruposSuscripto = [];
 
 var r1 = readline.createInterface({
     input: process.stdin,
@@ -66,7 +66,6 @@ if(inicio){
     });
 };
 
-
 function solicitud_Informacion_Coordinador (accion, topico, id_p){
     let peticion = new Object();
     peticion.accion = accion;
@@ -75,6 +74,21 @@ function solicitud_Informacion_Coordinador (accion, topico, id_p){
     peticion = JSON.stringify(peticion);
     requester.send(peticion);
 };
+
+function addGroupIfNeeded(element) {
+    console.log(element.topico);
+    if (element.topico.startsWith(MESSAGE+'g_')) {
+        let socket = zmq.socket(PUB);
+        let grupo = {
+            topico: element.topico,
+            pub: socket,
+            conect: true
+        }
+        socket.connect(createURlWith(element.ip, element.puerto));
+        gruposSuscripto.push(grupo);
+    }
+    
+}
 
 requester.on("message", function (reply) { //deberia volver los ip y puertos de All, heartbeat y del cliente mismo
     let response = JSON.parse(reply);
@@ -115,12 +129,16 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
             createHeartbeatInterval();
         }
         else{ 
-            //cuando se pide datos de un topico para publicar que no se heartbeat
-            let indice = lista_clientes_vivos.findIndex((currentValue) => MESSAGE+currentValue.id == datos_broker[0].topico);
-            if (indice != -1){
-                lista_clientes_vivos[indice].pub.connect(createURlWith(datos_broker[0].ip, datos_broker[0].puerto));
-                lista_clientes_vivos[indice].conect = true;
-                prueba();
+            if (datos_broker[0].topico.includes(MESSAGE + 'g_')) {
+                addGroupIfNeeded(datos_broker[0]);
+            } else {
+                //cuando se pide datos de un topico para publicar que no se heartbeat
+                let indice = lista_clientes_vivos.findIndex((currentValue) => MESSAGE+currentValue.id == datos_broker[0].topico);
+                if (indice != -1){
+                    lista_clientes_vivos[indice].pub.connect(createURlWith(datos_broker[0].ip, datos_broker[0].puerto));
+                    lista_clientes_vivos[indice].conect = true;
+                    prueba();
+                }
             }
         }
     }
@@ -163,10 +181,6 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
 
 
 function heartbeatReceived(mensaje) {
-    //console.log(mensaje.emisor);
-    //console.log("Se recibio la cola de mensajes ", mensaje);
-    //displayMessagesNotWatched(mensaje.colaMensajes);
-
     let index = lista_clientes_vivos.findIndex((currentValue) => currentValue.id == mensaje.emisor);
     if (index != -1){
         lista_clientes_vivos[index].fecha = mensaje.fecha;
@@ -174,15 +188,6 @@ function heartbeatReceived(mensaje) {
         addClienteVivo(mensaje.emisor, mensaje.fecha);
     }
 }
-/*
-function displayMessagesNotWatched(colaMensajes) {
-    let messagesNotPreviouslyDisplayed = colaMensajes.filter(function(currentValue) {
-        let emisor = currentValue.mensaje.emisor;
-        let messagesReceivedForCurrentEmisor = messagesReceived.filter((element) => element.emisor == emisor);
-        return messagesReceivedForCurrentEmisor.findIndex((value) => currentValue.mensaje.mensaje == value.mensaje) == -1;
-    });
-    console.log("Mensajes no mostrados anteriormente: \n", messagesNotPreviouslyDisplayed);
-}*/
 
 
 function createHeartbeatInterval() {
@@ -263,9 +268,47 @@ function procesarMensaje (data){
     };
 }
 
+function enviarMensajeAGrupo(data) {
+    let index = gruposSuscripto.findIndex((currentValue) => currentValue.topico == MESSAGE + data[0]);
+    let mensaje = new Object();
+    mensaje.emisor = id_cliente;
+    mensaje.mensaje = data[1];
+    mensaje.fecha = new Date().toISOString();
+    mensaje = JSON.stringify(mensaje);
+
+    // Envia mensaje a grupo
+    gruposSuscripto[index].pub.send([MESSAGE+data[0], mensaje]);
+}
+
 r1.on('line',(data) => {
-    procesarMensaje(data.trim());
+    let trimmedData = data.trim();
+    if (trimmedData.startsWith('/group')){
+        handleGroupCommand(data);
+    } else {
+        if (data.startsWith('g_')) {
+            let splittedData = data.split(':');
+            console.log("Splitted data: ", splittedData);
+            console.log("Grupos suscripto: ", gruposSuscripto);
+            if (gruposSuscripto.findIndex((currentValue) => currentValue.topico == MESSAGE + splittedData[0]) == -1) {
+                console.log("Debe estar suscripto al grupo para poder enviar mensajes");
+            } else {
+                enviarMensajeAGrupo(splittedData);
+            }
+        } else {
+            procesarMensaje(trimmedData);
+        }
+    }
 });
+
+function handleGroupCommand(data) {
+    let splittedData = data.split(' ');
+    if (splittedData.length > 1) {
+        solicitud_Informacion_Coordinador(1, MESSAGE + splittedData[1], id_cliente);
+    } else {
+        console.log("Para ingresar un grupo debe indicar /group 'g_IDGRUPO'");
+    }
+    
+}
 
 
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {

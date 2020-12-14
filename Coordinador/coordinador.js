@@ -180,7 +180,7 @@ responder.on('message', (request) => {
                 respuesta.exito = consulta.exito;
                 respuesta.accion = req.accion;
                 respuesta.idPeticion = req.idPeticion;
-                if (consulta.exito == true){
+                if (consulta.exito == true) {
                     respuesta.resultados = {datosBroker:[]};
                     respuesta.resultados.datosBroker.push(consulta.datosBroker);
                 }
@@ -206,12 +206,14 @@ responder.on('message', (request) => {
             callAllBroker(req, (responses) =>{
                 const AllExito = (currentValue) => currentValue.exito == true;
                 respuesta.exito = responses.every(AllExito);
-                //console.log('respuestas del broker: ', responses.map((currentValue) => currentValue.exito));
                 if (respuesta.exito){
+                    
                     const datosBroker = (currentValue) => currentValue.datosBroker;
                     respuesta.resultados = {
                         datosBroker: responses.map(datosBroker)
                     };
+                    console.log("AL COORDINADOR LE LLEGA LA RESPUESTA: ", respuesta.resultados);
+                    console.log("AL COORDINADOR LE LLEGA LA RESPUESTA: ", respuesta.resultados.toString());
                 }
                 else{
                     respuesta.error = responses.find(element => element.error != null).error;

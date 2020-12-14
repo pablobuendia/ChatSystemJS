@@ -83,7 +83,7 @@ subSocket.on('message', function (topic, message) {
         } else {
             colaMensajes = colasMensajes[index];
         }
-        
+
         if (colaMensajes != undefined) {
             colaMensajes.mensajes.push({
                 mensaje : message,
@@ -99,7 +99,7 @@ subSocket.on('message', function (topic, message) {
 
 // Cuando el pubSocket recibe un tópico, subSocket debe subscribirse a él; para eso se utiliza el método send
 pubSocket.on('message', function (topic) {
-    if (!(listaTopicos.has(topic.toString()))){
+    if (!(listaTopicos.has(topic.toString()))) {
         subSocket.send(topic.toString());
     };
 });
@@ -178,6 +178,7 @@ responder.on('message', (bufferRequest) => {
                 resultados: {},
                 topico:request.topico
             };
+            console.log("Se envia la respuesta : ", jsonRespuesta);
             responder.send(JSON.stringify(jsonRespuesta));
 
             break;
