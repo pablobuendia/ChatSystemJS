@@ -2,6 +2,7 @@ const zmq = require('zeromq');
 const net = require('net');
 const fs = require('fs');
 const nroBroker = 3;
+const ACCION_NUEVO_TOPICO = 3;
 
 var listaBrokers = []; 
 var totalTopicos = 0;
@@ -76,29 +77,27 @@ function eleccionDeBroker (req){
 
 function notificarBroker (index, request){
     request = JSON.stringify(request);
-    switch (index){
-        case 0:
-            requesters[0].send(request);
-            break; 
-        case 1:
-            requesters[1].send(request);
-            break;
-        case 2:
-            requesters[2].send(request);
-            break;
-    }
+    requesters[index].send(request);
 }
 
-function consultar_broker (req, callback){
+
+function consultar_broker (request, callback){
     let respuesta;
     let i;
-    let topico = req.topico;
+    let topico = request.topico;
     i = verificaExistenciaTopico(topico);
-    if ( i == -1){ 
+    if ( i == -1){ //cambiar la accion a 3: nuevo topico, es una nueva request
         //No hay ningun broker que maneje ese topico, se le asigna a un broker el manejo del topico 
+        let req = {
+            idPeticion: request.idPeticion,
+            accion: ACCION_NUEVO_TOPICO,
+            topico: request.topico
+        };
+        console.log('request mandada al broker por un nuevo topico: ', req);
         i = eleccionDeBroker(req);
         requesters.forEach((element) => {
             element.on('message', (response, err) =>{
+                console.log('Se quedo esperando aca!');
                 let res = response.toString();
                 res = JSON.parse(res);
                 if (res.exito == true){
@@ -108,7 +107,7 @@ function consultar_broker (req, callback){
                     };
                     respuesta.datosBroker.topico = topico;
                     respuesta.datosBroker.ip = listaBrokers[i].ip;
-                    if (req.accion == 1) {
+                    if (request.accion == 1) {
                         respuesta.datosBroker.puerto = listaBrokers[i].portSUB
                     }
                     else{
@@ -128,19 +127,27 @@ function consultar_broker (req, callback){
             });
         })
     }                               
-    else{
+    else { //ya existe un broker que maneje ese topico, le avisa al broker que un nuevo suscriptor llega
+        /*let req = {
+            accion: accion,
+            topico: topico
+        }
+        console.log('request mandada ya sabiendo el broker: ', req);
+        notificarBroker(i, req);
+        console.log("Sigue");*/
         respuesta = {
             exito: true,
             datosBroker: new Object()
         };
         respuesta.datosBroker.topico = topico;
         respuesta.datosBroker.ip = listaBrokers[i].ip;
-        if (req.accion == 1) {
+        if (request.accion == 1) {
             respuesta.datosBroker.puerto = listaBrokers[i].portSUB
         }
         else{
             respuesta.datosBroker.puerto = listaBrokers[i].portPUB
         }
+        console.log("LINEA 151 respuesta: ", respuesta);
         callback(respuesta);
     }
 }
@@ -229,6 +236,32 @@ responder.on('message', (request) => {
                 responder.send(JSON.stringify(respuesta));
             })
             break;
+        case 7:
+            let index = verificaExistenciaTopico(req.topico);
+            respuesta = new Object();
+            respuesta.accion = req.accion;
+            respuesta.idPeticion = req.idPeticion;
+            if (index != -1){
+                respuesta.exito = true;
+                respuesta.resultados = {
+                    datosBroker: [{
+                        topico: req.topico,
+                        ip: listaBrokers[index].ip,
+                        puerto: listaBrokers[index].portRR
+                    }]
+                };
+                console.log('respuesta por el puerto RR: ', respuesta);
+                responder.send(JSON.stringify(respuesta));
+            }
+            else{
+                respuesta.exito = false,
+                respuesta.error = {
+                    codigo: 1,
+                    mensaje: "Topico inexistente"
+                }
+                console.log('respuesta como error de puerto RR: ', respuesta);
+                responder.send(JSON.stringify(respuesta));
+            }
   }
 });
 
