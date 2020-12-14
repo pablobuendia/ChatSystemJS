@@ -16,9 +16,8 @@ var requesters=[];
 // Esta es la lista que va a almacenar las responses para responder a las request de los clientes
 var listaResponses = [];
 
-for(let i=0;i<nroBroker;i++)
-{
-    requesters[i]=zmq.socket('req');
+for (let i = 0; i < nroBroker; i++) {
+    requesters[i] = zmq.socket('req');
 }
 
 fs.readFile('configuracion.txt', 'utf8', (err, data) => {
@@ -52,13 +51,14 @@ function updateListaBrokers (obj) {
 const responseHandler = (request, response) => {
     const urlParseada = url.parse(request.url, true);
     const pathname = urlParseada.pathname;
+    let idPeticionNueva;
     switch (request.method) {
         case 'GET':
-            let idPeticionNueva = handleGetAction(pathname, request.method);
+            idPeticionNueva = handleGetAction(pathname, request.method);
 
             // Si la id es -1 entonces no se encontro el broker
             if (idPeticionNueva === -1) {
-                response.writeHead(400);
+                response.writeHead(400, getOptionsHeaders());
                 response.end(JSON.stringify({
                     error: "No se encontro un broker con el codigo apropiado"
                 }));
@@ -74,9 +74,23 @@ const responseHandler = (request, response) => {
             response.end();
             break;
         case 'DELETE':
+            idPeticionNueva = handleGetAction(pathname, request.method);
+
+            // Si la id es -1 entonces no se encontro el broker
+            if (idPeticionNueva === -1) {
+                response.writeHead(400, getOptionsHeaders());
+                response.end(JSON.stringify({
+                    error: "No se encontro un broker con el codigo apropiado"
+                }));
+            } else {
+                listaResponses.push({
+                    idPeticion: idPeticionNueva,
+                    respuesta: response
+                })
+            }
             break;
         default:
-            response.writeHead(405);
+            response.writeHead(405, getOptionsHeaders());
             response.end(JSON.stringify({
                 error: "Method not allowed"
             }));
@@ -104,7 +118,7 @@ function handleGetAction(paths, method) {
     let idBroker = splittedPath[2];
     let idPeticionNueva;
     // Encontrar el requester de acuerdo al codigo del broker
-    let brokerIndex = listaBrokers.findIndex(broker => broker.id = idBroker);
+    let brokerIndex = listaBrokers.findIndex(broker => broker.id_broker.split('/')[1] == idBroker);
 
     if (brokerIndex == -1) {
         console.log("No se encontro un broker con la id buscada, se rechaza la respuesta");
@@ -112,7 +126,6 @@ function handleGetAction(paths, method) {
     } else {
         idPeticionNueva = generadorIdPeticion++;
         if (lastPath == 'topics') {
-            console.log("Entro en 115");
             console.log("requester", requesters[brokerIndex]);
             requesters[brokerIndex].send(JSON.stringify({
                 idPeticion: idPeticionNueva,
@@ -165,7 +178,7 @@ function prepareRequesters() {
                 } else {
                     let response = listaResponses[responseIndex];
                     response.respuesta.writeHead(200, getOptionsHeaders());
-                    response.respuesta.end(JSON.stringify(bufferReply.toString()));
+                    response.respuesta.end(JSON.stringify(reply));
                 }
             } else {
                 console.log("Hubo un error en la operacion");
@@ -173,6 +186,3 @@ function prepareRequesters() {
         });
     });
 }
-
-
-

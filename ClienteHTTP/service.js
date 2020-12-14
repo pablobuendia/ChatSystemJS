@@ -4,6 +4,7 @@ const URL = 'http://localhost:8080';
 function getTopicsListFromBroker() {
     var xmlHttp = new XMLHttpRequest();
     xmlHttp.overrideMimeType("application/json");
+
     let idBroker = getElementById("idBroker");
 
     xmlHttp.onreadystatechange = function () {
@@ -12,8 +13,8 @@ function getTopicsListFromBroker() {
             console.log('Respuesta del servidor: ', response);
             let topicsArray = response.resultados.listaTopicos;
             displayTopicsList('tablaTopicos',topicsArray);
-        } else if (xmlHttp.status.startsWith("4")) {
-            displayText("mensajeBorrado", "Error al obtener la lista de topicos:" + xmlHttp.response + ". Status: " + xmlHttp.status + ". Readystate: " + this.readyState);
+        } else if (xmlHttp.status >= 400) {
+            displayText("errorTopicos", "Error al obtener la lista de topicos:" + xmlHttp.response + ". Status: " + xmlHttp.status + ". Readystate: " + this.readyState);
         }
     }
     
@@ -31,16 +32,12 @@ function deleteTopic() {
     xmlHttp.onreadystatechange = function() {
         if (this.readyState == 4 && xmlHttp.status == OK) {
             displayText("mensajeBorrado", "Topico borrado correctamente");
-        } else if (xmlHttp.status.startsWith("4")) {
+        } else if (xmlHttp.status >= 400) {
             displayText("mensajeBorrado", "Error al borrar el topico: " + topicToDelete + ". Response: " + xmlHttp.response + ". Status: " + xmlHttp.status + ". Readystate: " + this.readyState);
         } 
     }
     xmlHttp.open("DELETE", `${URL}/broker/${idBroker}/topics/${topicToDelete}`, true);
     xmlHttp.send();
-}
-
-function displayMessagesFromTopic(messages) {
-    console.log(messages);
 }
 
 function getMessageListFromTopic() {
@@ -49,11 +46,11 @@ function getMessageListFromTopic() {
     let idBroker = getElementById("idBrokerTopico");
     xmlHttp.onreadystatechange = function() { 
         if (this.readyState == 4 && xmlHttp.status == OK) {
-            let messagesArray = JSON.parse(xmlHttp.responseText);
-            displayMessagesFromTopic(messagesArray);
+            let messagesArray = JSON.parse(xmlHttp.responseText).resultados;
+            displayTopicsList("tablaMensajes", messagesArray);
         } 
-        else if (xmlHttp.status.startsWith("4")) {
-            displayText("mensajeBorrado", "Error al obtener los mensajes del topico " + topico);
+        else if (xmlHttp.status >= 400) {
+            displayText("errorMensajes", "Error al obtener los mensajes del topico " + topico);
         }  
     }
     xmlHttp.open("GET", `${URL}/broker/${idBroker}/topics/${topico}`, true);
