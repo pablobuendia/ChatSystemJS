@@ -9,7 +9,7 @@ const zmq = require('zeromq');
 
 
 // Consts sections
-const intervaloNTP = 120; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
+const intervaloNTP = 10; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
 const puertoNTP = 4444;
 const cantidad_brokers=3;
 const REQ = 'req';
@@ -25,6 +25,7 @@ var ip_coordinador;
 var port_coordinador;
 var prueba = () => {};
 var idPeticion = 0;
+var delay = 0;
 
 var messagesReceived = [];
 
@@ -82,7 +83,6 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
         datos_broker.forEach(element => {
             let asunto = new Object();
             asunto.topico = element.topico;
-            console.log('Suscripto a: ', element.topico);
             asunto.sub = zmq.socket('sub');
             asunto.sub.connect(createURlWith(element.ip, element.puerto));
             asunto.sub.subscribe(element.topico.toString());
@@ -108,7 +108,6 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
         });
         solicitud_Informacion_Coordinador(7, MESSAGE+ALL, idPeticion++); //si ya sabe cual es el puerto RR
         solicitud_Informacion_Coordinador(7, MESSAGE+id_cliente, idPeticion++);
-        console.log('Puede comenzar a escribir');
     }
     else if (response.accion == 1){ //Si es una respuesta al pedido de datos de un broker para publicacion
         if( datos_broker[0].topico == HEARTBEAT){
@@ -117,7 +116,6 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
         }
         else{ 
             //cuando se pide datos de un topico para publicar que no se heartbeat
-            //Asumimos que el topico por el cual se solicito informacion sobre el broker que lo maneja, ya existe en la lista_clientes_vivos
             let indice = lista_clientes_vivos.findIndex((currentValue) => MESSAGE+currentValue.id == datos_broker[0].topico);
             if (indice != -1){
                 lista_clientes_vivos[indice].pub.connect(createURlWith(datos_broker[0].ip, datos_broker[0].puerto));
@@ -128,14 +126,12 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
     }
     else{ //llego respuesta del puerto request/reply
         if (response.exito == true){
-            //console.log('respuesta del coordinador sobre los puertos RR: ', response.resultados);
             let obj = new Object();
             obj.req = zmq.socket('req');
             obj.topicos = [];
             obj.topicos.push(datos_broker[0].topico);
             lista_brokers_rr.push(obj);
             let i = lista_brokers_rr.findIndex((value) => value.topicos.includes(datos_broker[0].topico));
-            //console.log('index encontrado en lista_broker_rr: ', i);
             if (i != -1){
                 lista_brokers_rr[i].req.connect(createURlWith(datos_broker[0].ip, datos_broker[0].puerto));
                 let peticion = new Object();
@@ -144,22 +140,16 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
                 peticion.topico = datos_broker[0].topico;
                 lista_brokers_rr[i].req.send(JSON.stringify(peticion));
                 lista_brokers_rr.forEach((element) => {
-                    //console.log(element);
                     element.req.on('message', (response) => {
                         let respuesta_broker_rr = JSON.parse(response);
-                        //console.log('respuesta del broker RR: ', respuesta_broker_rr);
                         if (respuesta_broker_rr.exito == true){
                             let colaMensajes = respuesta_broker_rr.resultados.colaMensajes; //array de objetos tipo: {emisor, mensaje, fecha}
-                            //console.log('Cola entera: ', colaMensajes.emisor,' : ', colaMensajes.mensaje);
                             console.log("Hubo mensajes enviados anteriormente: \n");
                             colaMensajes.forEach((element) => {
                                 let leer = JSON.parse(element)
                                 console.log('Emisor: ', leer.emisor, ' : ', leer.mensaje);
                             });
-                        }
-                        else{
-                            //console.log('No se encontraron mensajes anteriores de ese topico, \nerror: ', respuesta_broker_rr.error.codigo, '\n descripcion: ', respuesta_broker_rr.error.mensaje)
-                        }
+                        }// sino (else) no imprime nada
                     })
                 })
             }
@@ -199,10 +189,11 @@ function createHeartbeatInterval() {
     var interval = setInterval(() => {
         let mensaje = new Object();
         mensaje.emisor = id_cliente;
-        mensaje.fecha = new Date().toISOString();
+        mensaje.fecha = new Date(Date.now()+delay).toISOString();
         mensaje = JSON.stringify(mensaje);
         pub_heartbeat.send([HEARTBEAT, mensaje]);
     }, 10000);
+    console.log('Puede comenzar a escribir');
 }
 
 function createURlWith(ip, port) {
@@ -223,7 +214,7 @@ setInterval(()=>{
 
 function isAnExpiredClient(client) {
     let currentDate = new Date().getTime();
-    let elementDate = new Date (client.fecha).getTime();
+    let elementDate = new Date (client.fecha+delay).getTime();
     return currentDate - elementDate > 30000;
 }
 
@@ -242,7 +233,7 @@ function procesarMensaje (data){
     let mensaje = new Object();
     mensaje.emisor = id_cliente;
     mensaje.mensaje = array_mensaje[1];
-    mensaje.fecha = new Date().toISOString();
+    mensaje.fecha = new Date(Date.now()+delay).toISOString();
     mensaje = JSON.stringify(mensaje);
     if (index == -1){
         if (array_mensaje[0] == ALL){
@@ -277,45 +268,12 @@ r1.on('line',(data) => {
 });
 
 
-
-/*
-La conexión siguiente se tiene que hacer a partir de la devolución del coordinador a donde se tiene que conectar
-
-
-PREGUNTA: por cada broker al que se quiere conectar debe tener un subSocket y un pubSocket? ---------------------------------- PREGUNTA
-Porque se tiene que conectar a diferentes puertos para recibir mensaje de los distintos topicos
-
-subSocket.on('message', function (topic, message) {
-    let mensaje = message.toString();
-    mensaje = JSON.parse(mensaje);
-    if (mensaje.id_cliente != id_cliente) {
-        console.log('Recibio topico: ', topic.toString(), ' con mensaje: ', mensaje.mensaje);
-    }
-});
-
-
-r1.on('line', (mensaje) => {
-    let arrayMensaje = mensaje.split(':');
-    let aux = new Date().now();
-    let fecha = new Date(aux + delay);
-    fecha = fecha.toISOString();
-    let message = '{"emisor":"' + id_cliente + '", "mensaje":"' + arrayMensaje[1] + '", "fecha":"' + fecha + '"}';
-    pubSocket.send([arrayMensaje[0], message]);
-    r1.close();
-}); //MEJORAR, solamente permite que envie 1 mensaje y hasta ahí llego. 
-//Tener en cuenta que el cliente siempre esta esperando que le ingresen un mensaje para publicar si es que es publisher. 
-
-Se espera que el mensaje ingresado para ser enviado contenga el topico 
-Ejemplo:
-    All: hola
-    id_cliente: hola
-*//*
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     console.log("Cliente comienza a sincronizarse con el servidor NTP");
     setInterval(() => {
 
-        var T1 = (new Date(Date.now())).toISOString();
-        console.log("Escribiendo desde cliente " + id_cliente + "..." + T1)
+        var T1 = (new Date()).toISOString();
+        //console.log("Escribiendo desde cliente " + id_cliente + "..." + T1)
         clienteNTP.write(JSON.stringify({
             t1: T1
         }));
@@ -325,7 +283,7 @@ var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
 
 
 clienteNTP.on('data', function (data) {
-    console.log("Cliente " + id_cliente + " Se recibio respuesta de servidor NTP.")
+    //console.log("Cliente " + id_cliente + " Se recibio respuesta de servidor NTP.")
 
     // tiempo de arribo del mensaje del servidor
     var T4 = (new Date(Date.now())).getTime();
@@ -339,5 +297,5 @@ clienteNTP.on('data', function (data) {
     // calculamos delay de la red
     delay = ((T2 - T1) + (T3 - T4)) / 2;
 
-    console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
-});*/
+    //console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
+});

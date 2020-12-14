@@ -9,7 +9,6 @@ const MOSTRAR_TOPICOS = '4';
 const MOSTRAR_MENSAJES = '5';
 const BORRAR_MENSAJES = '6';
 const NUEVO_SUSCRIPTOR = 7;
-//const inquirer = require('inquirer');
 const net =require('net');
 
 const intervaloNTP = 120; // 120 segundos
@@ -28,6 +27,7 @@ var portSUB;
 var portPUB;
 var listaTopicos = new Set();
 var intervalo = 120; // 120 segundos
+var delay =0;
 
 
 // Crear interfaz para la consola
@@ -61,7 +61,6 @@ function assignPort (idB){
 
         let i = file.indexOf('broker/'+idB);
         portSUB = direccionTCP.concat(file[i+1]);
-        //subSocket.subscribe("".getBytes());
         subSocket.bindSync(portSUB);
         portPUB = direccionTCP.concat(file[i+2]);
         pubSocket.bindSync(portPUB);
@@ -72,38 +71,31 @@ function assignPort (idB){
 
 
 // Redirige todos los mensajes que recibimos
-/*
-message = {
-    emisor, mensaje, fecha
-}
-*/
 subSocket.on('message', function (topic, message) {
-        console.log(message.toString() + 'llegooooooo');
         pubSocket.send([topic, message]);
-
-        // Meter mensaje en la cola
 
         let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico == topic.toString());
 
         let colaMensajes;
-        console.log('INDICE: ', index, 'TOPCO: ', topic);
         if (index == -1) {
             colaMensajes = {topico : topic, mensajes : []}
             colasMensajes.push(colaMensajes);
         } else {
             colaMensajes = colasMensajes[index];
         }
-
-        if (colaMensajes.length > cantMaxColaMensajes) {
-            colaMensajes.shift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
-        }
+        
         if (colaMensajes != undefined) {
             colaMensajes.mensajes.push({
                 mensaje : message,
-                timestamp: (new Date()).getTime() + maxAgeColaMensajes * 1000
+                timestamp: (new Date(Date.now()+delay)).getTime() + maxAgeColaMensajes * 1000
             });
         }
+        if (colaMensajes.mensajes.length > cantMaxColaMensajes) {
+            colaMensajes.mensajes.shift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
+        };
 });
+
+
 
 // Cuando el pubSocket recibe un tópico, subSocket debe subscribirse a él; para eso se utiliza el método send
 pubSocket.on('message', function (topic) {
@@ -115,12 +107,10 @@ pubSocket.on('message', function (topic) {
 responder.on('message', (bufferRequest) => {
     // Tiene que incluir dentro de su lista el nuevo topico que le envió el coordinador
     let request = JSON.parse(bufferRequest.toString());
-    console.log('Llego un mensaje con: ', request);
     let index;
     let jsonRespuesta;
     switch (request.accion) {
         case MOSTRAR_TOPICOS:
-            console.log('Lista de topicos a enviar: ', listaTopicos);
             responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {listaTopicos: Array.from(listaTopicos)})));
             break;
         case MOSTRAR_MENSAJES:
@@ -149,11 +139,9 @@ responder.on('message', (bufferRequest) => {
             }
             break;
         case NUEVO_SUSCRIPTOR: //me avisa que hay un nuevo suscriptor a quien mandarle la cola de mensajes
-            console.log('Entro aca, broker linea: 164');
             jsonRespuesta;
             index =colasMensajes.findIndex((value) => value.topico == request.topico);
             if (index != -1){
-                console.log('estoy aqui por RR, la cola de mensajes es: ', colasMensajes[index].mensajes[0].mensaje.toString());
                 jsonRespuesta = {
                     exito: true,
                     accion: request.accion,
@@ -162,13 +150,10 @@ responder.on('message', (bufferRequest) => {
                     topico:request.topico
                 };
                 colasMensajes[index].mensajes.forEach((element) => {
-                    console.log('quiero escribir en la cola de mensajes: ',element.mensaje.toString());
                     jsonRespuesta.resultados.colaMensajes.push(element.mensaje.toString());
                 });
-                console.log('respuesta a enviar como RR: ', jsonRespuesta.resultados.colaMensajes.toString());
             }
             else{
-                console.log('no se encontro mensajes en la cola de ese topico');
                 jsonRespuesta = {
                     exito: false,
                     accion: request.accion,
@@ -186,7 +171,6 @@ responder.on('message', (bufferRequest) => {
                 listaTopicos.add(request.topico); //que no agrege dos veces el mismo topico
             }
             
-            console.log('LINEA: 180, lista de topicos: ', listaTopicos);
             jsonRespuesta = {
                 exito: true,
                 accion: request.accion,
@@ -230,40 +214,27 @@ function createResponse(accion, idPeticion, resultados, topico, error) {
     return respuesta;
 }
 
-/*
-{
-             "exito": boolean,
-  “accion”:”cod_op”,
-  “idPeticion”:  id,
-             “resultados”: {},
-             “error”: {
-                           “codigo”: cod,
-                           “mensaje”: “description”
-                           }
-}
-*/
 
 /**
  * Funcion que recorre periodicamente las colas de mensajes para comprobar que no hayan vencido. Si es asi los remueve de la cola
- 
+ */
 setInterval(() => {
     colasMensajes.forEach(colaMensajes => {
-        colaMensajes.forEach((mensaje) => {
-            if (mensaje.timestamp < Date.now()) {
-                colaMensajes.shift();
+        colaMensajes.mensajes.forEach((mensaje, indice) => {
+            if (mensaje.timestamp < (Date.now())+delay) {
+                colaMensajes.mensajes.splice(indice, 1);
             }
         });
     })
-
 }, 1000);
 
-*/
+
 // --------------------- COMIENZO MODULO NTP -------------------------
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     setInterval(() => {
 
-        var T1 = (new Date()).getTime().toISOString();
-        console.log("Enviando sincronizacion desde broker.")
+        var T1 = (new Date()).toISOString();
+        //console.log("Enviando sincronizacion desde broker.")
         clienteNTP.write(JSON.stringify({
             t1: T1
         }));
@@ -273,7 +244,7 @@ var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
 
 
 clienteNTP.on('data', function (data) {
-    console.log("Broker recibio respuesta de servidor NTP")
+    //console.log("Broker recibio respuesta de servidor NTP")
     var T4 = (new Date()).getTime();
 
 

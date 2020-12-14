@@ -35,7 +35,6 @@ fs.readFile('configuracion.txt', 'utf8', (err, data) => {
     let dir;
     for(let j =0; j<nroBroker; j++){
         dir = 'tcp://' +listaBrokers[j].ip + ':' + listaBrokers[j].portRR;
-        console.log('dir: ', dir);
         requesters[j].connect(dir);
     }
 });
@@ -69,8 +68,6 @@ function eleccionDeBroker (req){
     totalTopicos++;
     let index = (totalTopicos % nroBroker);
     listaBrokers[index].topicos.push(req.topico);
-    console.log('El broker elegido fue: ', index, '\n lista Brokers nueva: ', listaBrokers[index]);
-    console.log('i ', index);
     notificarBroker(index, req);
     return index;
 }
@@ -93,11 +90,9 @@ function consultar_broker (request, callback){
             accion: ACCION_NUEVO_TOPICO,
             topico: request.topico
         };
-        console.log('request mandada al broker por un nuevo topico: ', req);
         i = eleccionDeBroker(req);
         requesters.forEach((element) => {
             element.on('message', (response, err) =>{
-                console.log('Se quedo esperando aca!');
                 let res = response.toString();
                 res = JSON.parse(res);
                 if (res.exito == true){
@@ -127,14 +122,7 @@ function consultar_broker (request, callback){
             });
         })
     }                               
-    else { //ya existe un broker que maneje ese topico, le avisa al broker que un nuevo suscriptor llega
-        /*let req = {
-            accion: accion,
-            topico: topico
-        }
-        console.log('request mandada ya sabiendo el broker: ', req);
-        notificarBroker(i, req);
-        console.log("Sigue");*/
+    else { 
         respuesta = {
             exito: true,
             datosBroker: new Object()
@@ -147,7 +135,6 @@ function consultar_broker (request, callback){
         else{
             respuesta.datosBroker.puerto = listaBrokers[i].portPUB
         }
-        console.log("LINEA 151 respuesta: ", respuesta);
         callback(respuesta);
     }
 }
@@ -165,11 +152,9 @@ function callAllBroker (req, callback){
         switch (i){
             case 1:
                 req.topico = 'message/all';
-                console.log('REALIZO EL CAMBIO A ALL\n');
                 break;
             case 2:
                 req.topico = 'heartbeat';
-                console.log('REALIZO EL CAMBIO A HEARTBEAT\n');
                 break;
         }
         callBroker(req, (response) => {
@@ -187,7 +172,7 @@ responder.on('message', (request) => {
   let req = request.toString();
   req = JSON.parse(req);
   console.log(req);
-  //let respuesta;
+  let respuesta;
   switch (req.accion) {
         case 1: //publicacion
             consultar_broker(req, (consulta) => {
@@ -221,8 +206,7 @@ responder.on('message', (request) => {
             callAllBroker(req, (responses) =>{
                 const AllExito = (currentValue) => currentValue.exito == true;
                 respuesta.exito = responses.every(AllExito);
-                console.log('respuestas del broker: ', responses.map((currentValue) => currentValue.exito));
-                console.log('Exito: ', respuesta.exito);
+                //console.log('respuestas del broker: ', responses.map((currentValue) => currentValue.exito));
                 if (respuesta.exito){
                     const datosBroker = (currentValue) => currentValue.datosBroker;
                     respuesta.resultados = {
@@ -250,7 +234,6 @@ responder.on('message', (request) => {
                         puerto: listaBrokers[index].portRR
                     }]
                 };
-                console.log('respuesta por el puerto RR: ', respuesta);
                 responder.send(JSON.stringify(respuesta));
             }
             else{
@@ -259,7 +242,7 @@ responder.on('message', (request) => {
                     codigo: 1,
                     mensaje: "Topico inexistente"
                 }
-                console.log('respuesta como error de puerto RR: ', respuesta);
+                console.log('respuesta: ', respuesta);
                 responder.send(JSON.stringify(respuesta));
             }
   }

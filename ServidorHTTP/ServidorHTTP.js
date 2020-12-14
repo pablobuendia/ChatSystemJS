@@ -35,7 +35,7 @@ fs.readFile('configuracion.txt', 'utf8', (err, data) => {
     let dir;
     for(let j = 0; j < nroBroker; j++){
         dir = 'tcp://' +listaBrokers[j].ip + ':' + listaBrokers[j].portRR;
-        console.log('dir: ', dir);
+        //console.log('dir: ', dir);
         requesters[j].connect(dir);
     }
     prepareRequesters();
@@ -151,17 +151,6 @@ function handleGetAction(paths, method) {
     }
 }
 
-/*
-"exito": boolean,
-“accion”:”cod_op”,
-“idPeticion”:  id,
-           “resultados”: {},
-           “error”: {
-                         “codigo”: cod,
-                         “mensaje”: “description”
-                         }
-}
-*/
 
 function prepareRequesters() {
     requesters.forEach((element) => {
