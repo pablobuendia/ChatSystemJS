@@ -217,13 +217,13 @@ setInterval(() => {
 
 }, 1000);
 
-
+*/
 // --------------------- COMIENZO MODULO NTP -------------------------
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
     setInterval(() => {
 
         var T1 = (new Date()).getTime().toISOString();
-        console.log("Enviando sincronizacion desde broker...")
+        console.log("Enviando sincronizacion desde broker.")
         clienteNTP.write(JSON.stringify({
             t1: T1
         }));
@@ -244,8 +244,7 @@ clienteNTP.on('data', function (data) {
     var T3 = (new Date(times.t3)).getTime();
 
     // calculamos delay de la red
-    delay = ((T2 - T1) + (T4 - T3)) / 2;
+    delay = ((T2 - T1) + (T3 - T4)) / 2;
     console.log("Delay calculado para broker: " + delay);
 });
-*/
 // --------------------- FIN MODULO NTP -------------------------
