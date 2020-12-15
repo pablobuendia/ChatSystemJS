@@ -344,7 +344,7 @@ function handleGroupCommand(data) {
 
 
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
-    console.log("Cliente comienza a sincronizarse con el servidor NTP");
+    //console.log("Cliente comienza a sincronizarse con el servidor NTP");
     setInterval(() => {
 
         var T1 = (new Date()).toISOString();
