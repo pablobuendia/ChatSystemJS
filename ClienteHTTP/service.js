@@ -46,8 +46,8 @@ function getMessageListFromTopic() {
     let idBroker = getElementById("idBrokerTopico");
     xmlHttp.onreadystatechange = function() { 
         if (this.readyState == 4 && xmlHttp.status == OK) {
-            let messagesArray = JSON.parse(xmlHttp.responseText).resultados;
-            displayTopicsList("tablaMensajes", messagesArray);
+            let messagesArray = JSON.parse(xmlHttp.responseText).resultados.mensajes.mensajes;
+            displayMessagesList("tablaMensajes", messagesArray);
         } 
         else if (xmlHttp.status >= 400) {
             displayText("errorMensajes", "Error al obtener los mensajes del topico " + topico);
@@ -83,6 +83,23 @@ function displayTopicsList(idTabla, elements) {
         var newRow = tbodyRef.insertRow();
         var newCell = newRow.insertCell();
         var newText = document.createTextNode(elements[i]);
+        newCell.appendChild(newText);
+    }
+}
+
+/**
+ * Ingresa el array de elementos en la tabla
+ * @param {String} idTabla el id de la tabla en donde insertar el array
+ * @param {String[]} elements La lista de mensajes a ingresar
+ */
+function displayMessagesList(idTabla, elements) {
+    var tbodyRef = document.getElementById(idTabla).getElementsByTagName('tbody')[0];
+    tbodyRef.innerHTML = "";
+    for(i = 0; i < elements.length; i++) {
+        var newRow = tbodyRef.insertRow();
+        var newCell = newRow.insertCell();
+        var mensaje = JSON.parse(elements[i].mensaje);
+        var newText = document.createTextNode("Emisor: " + mensaje.emisor + ". Mensaje: " + mensaje.mensaje + ". Fecha: " + mensaje.fecha);
         newCell.appendChild(newText);
     }
 }

@@ -1,10 +1,10 @@
 "use strict";
 const fs = require('fs');
 const zmq = require('zeromq');
+const readline = require('readline');
 const subSocket = zmq.socket('xsub');
 const pubSocket = zmq.socket('xpub');
 const responder = zmq.socket('rep');
-const readline = require('readline');
 const MOSTRAR_TOPICOS = '4';
 const MOSTRAR_MENSAJES = '5';
 const BORRAR_MENSAJES = '6';
@@ -17,7 +17,7 @@ const hostNTP = 'localhost' //'127.0.0.1'; //
 const direccionTCP = 'tcp://127.0.0.1:';
 
 // Parametros para las cola de mensajes
-const colasMensajes = [];
+var colasMensajes = [];
 var maxAgeColaMensajes;
 var cantMaxColaMensajes;
 
@@ -78,7 +78,7 @@ subSocket.on('message', function (topic, message) {
 
         let colaMensajes;
         if (index == -1) {
-            colaMensajes = {topico : topic, mensajes : []}
+            colaMensajes = {topico : topic.toString(), mensajes : []}
             colasMensajes.push(colaMensajes);
         } else {
             colaMensajes = colasMensajes[index];
@@ -86,7 +86,7 @@ subSocket.on('message', function (topic, message) {
         
         if (colaMensajes != undefined) {
             colaMensajes.mensajes.push({
-                mensaje : message,
+                mensaje : message.toString(),
                 timestamp: (new Date(Date.now()+delay)).getTime() + maxAgeColaMensajes * 1000
             });
         }
@@ -114,7 +114,7 @@ responder.on('message', (bufferRequest) => {
             responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {listaTopicos: Array.from(listaTopicos)})));
             break;
         case MOSTRAR_MENSAJES:
-            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
+            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico.includes(request.topico))
             if (index === -1) { // Si no encuentra el index entonces el topico no está en la lista del broker
                 let error = {
                     codigo: 1,
@@ -122,11 +122,11 @@ responder.on('message', (bufferRequest) => {
                 }
                 responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, null, error)));
             } else {
-                responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {mensajes: colasMensajes[i]})));
+                responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {mensajes: colasMensajes[index]})));
             }
             break;
         case BORRAR_MENSAJES:
-            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
+            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico.toString().includes(request.topico))
             if (index === -1) { // Si no encuentra el index entonces el topico no está en la lista del broker
                 let error = {
                     codigo: 1,

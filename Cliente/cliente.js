@@ -1,12 +1,8 @@
 // Requires sections
-
 const readline = require('readline');
 const fs = require('fs');
 const net = require('net');
 const zmq = require('zeromq');
-
-
-
 
 // Consts sections
 const intervaloNTP = 10; // Intervalo de tiempo en el que sincronizar con el servidor NTP en segundos
