@@ -9,6 +9,7 @@ const MOSTRAR_TOPICOS = '4';
 const MOSTRAR_MENSAJES = '5';
 const BORRAR_MENSAJES = '6';
 const NUEVO_SUSCRIPTOR = 7;
+const MESSAGE = 'message/';
 const net =require('net');
 
 const intervaloNTP = 120; // 120 segundos
@@ -56,7 +57,6 @@ function assignPort (idB){
         if (err) {
             return console.log(err);
         }
-        console.log(data);
         file = data.split(',');
 
         let i = file.indexOf('broker/'+idB);
@@ -72,27 +72,32 @@ function assignPort (idB){
 
 // Redirige todos los mensajes que recibimos
 subSocket.on('message', function (topic, message) {
+        
+    if (listaTopicos.has(topic.toString())){
         pubSocket.send([topic, message]);
 
-        let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico == topic.toString());
+        if (!(topic.toString().startsWith(MESSAGE+'g_'))){
+            let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico == topic.toString());
 
-        let colaMensajes;
-        if (index == -1) {
-            colaMensajes = {topico : topic.toString(), mensajes : []}
-            colasMensajes.push(colaMensajes);
-        } else {
-            colaMensajes = colasMensajes[index];
+            let colaMensajes;
+            if (index == -1) {
+                colaMensajes = {topico : topic.toString(), mensajes : []}
+                colasMensajes.push(colaMensajes);
+            } else {
+                colaMensajes = colasMensajes[index];
+            }
+            
+            if (colaMensajes != undefined) {
+                colaMensajes.mensajes.push({
+                    mensaje : message.toString(),
+                    timestamp: (new Date(Date.now()+delay)).getTime() + maxAgeColaMensajes * 1000
+                });
+            }
+            if (colaMensajes.mensajes.length > cantMaxColaMensajes) {
+                colaMensajes.mensajes.shift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
+            };
         }
-        
-        if (colaMensajes != undefined) {
-            colaMensajes.mensajes.push({
-                mensaje : message.toString(),
-                timestamp: (new Date(Date.now()+delay)).getTime() + maxAgeColaMensajes * 1000
-            });
-        }
-        if (colaMensajes.mensajes.length > cantMaxColaMensajes) {
-            colaMensajes.mensajes.shift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
-        };
+    }
 });
 
 
