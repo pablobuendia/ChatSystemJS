@@ -1,14 +1,15 @@
 "use strict";
 const fs = require('fs');
 const zmq = require('zeromq');
+const readline = require('readline');
 const subSocket = zmq.socket('xsub');
 const pubSocket = zmq.socket('xpub');
 const responder = zmq.socket('rep');
-const readline = require('readline');
 const MOSTRAR_TOPICOS = '4';
 const MOSTRAR_MENSAJES = '5';
 const BORRAR_MENSAJES = '6';
 const NUEVO_SUSCRIPTOR = 7;
+const MESSAGE = 'message/';
 const net =require('net');
 
 const intervaloNTP = 120; // 120 segundos
@@ -17,7 +18,7 @@ const hostNTP = 'localhost' //'127.0.0.1'; //
 const direccionTCP = 'tcp://127.0.0.1:';
 
 // Parametros para las cola de mensajes
-const colasMensajes = [];
+var colasMensajes = [];
 var maxAgeColaMensajes;
 var cantMaxColaMensajes;
 
@@ -56,7 +57,6 @@ function assignPort (idB){
         if (err) {
             return console.log(err);
         }
-        console.log(data);
         file = data.split(',');
 
         let i = file.indexOf('broker/'+idB);
@@ -72,27 +72,32 @@ function assignPort (idB){
 
 // Redirige todos los mensajes que recibimos
 subSocket.on('message', function (topic, message) {
+        
+    if (listaTopicos.has(topic.toString())){
         pubSocket.send([topic, message]);
 
-        let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico == topic.toString());
+        if (!(topic.toString().startsWith(MESSAGE+'g_'))){
+            let index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico == topic.toString());
 
-        let colaMensajes;
-        if (index == -1) {
-            colaMensajes = {topico : topic, mensajes : []}
-            colasMensajes.push(colaMensajes);
-        } else {
-            colaMensajes = colasMensajes[index];
+            let colaMensajes;
+            if (index == -1) {
+                colaMensajes = {topico : topic.toString(), mensajes : []}
+                colasMensajes.push(colaMensajes);
+            } else {
+                colaMensajes = colasMensajes[index];
+            }
+            
+            if (colaMensajes != undefined) {
+                colaMensajes.mensajes.push({
+                    mensaje : message.toString(),
+                    timestamp: (new Date(Date.now()+delay)).getTime() + maxAgeColaMensajes * 1000
+                });
+            }
+            if (colaMensajes.mensajes.length > cantMaxColaMensajes) {
+                colaMensajes.mensajes.shift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
+            };
         }
-        
-        if (colaMensajes != undefined) {
-            colaMensajes.mensajes.push({
-                mensaje : message,
-                timestamp: (new Date(Date.now()+delay)).getTime() + maxAgeColaMensajes * 1000
-            });
-        }
-        if (colaMensajes.mensajes.length > cantMaxColaMensajes) {
-            colaMensajes.mensajes.shift(); // Si hay mas elementos que el maximo permitido entonces sacar el ultimo (el mas viejo) y descartarlo
-        };
+    }
 });
 
 
@@ -114,7 +119,7 @@ responder.on('message', (bufferRequest) => {
             responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {listaTopicos: Array.from(listaTopicos)})));
             break;
         case MOSTRAR_MENSAJES:
-            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
+            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico.includes(request.topico))
             if (index === -1) { // Si no encuentra el index entonces el topico no está en la lista del broker
                 let error = {
                     codigo: 1,
@@ -122,11 +127,11 @@ responder.on('message', (bufferRequest) => {
                 }
                 responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, null, error)));
             } else {
-                responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {mensajes: colasMensajes[i]})));
+                responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {mensajes: colasMensajes[index]})));
             }
             break;
         case BORRAR_MENSAJES:
-            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico === request.topico);
+            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico.includes(request.topico))
             if (index === -1) { // Si no encuentra el index entonces el topico no está en la lista del broker
                 let error = {
                     codigo: 1,
@@ -134,7 +139,7 @@ responder.on('message', (bufferRequest) => {
                 }
                 responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, null, error)));
             } else {
-                colasMensajes = colasMensajes.filter(colaMensajes => colaMensajes.topico !== request.topico); // Filtra la cola a borrar, efectvamente borrandola
+                colasMensajes = colasMensajes.filter(colaMensajes => !colaMensajes.topico.includes(request.topico)); // Filtra la cola a borrar, efectvamente borrandola
                 responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {})));
             }
             break;

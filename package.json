@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/pablobuendia/ChatSystemJS#readme",
   "dependencies": {
+    "@nodegui/nodegui": "^0.28.0",
     "bootstrap": "^4.5.3",
     "inquirer": "^7.3.3",
     "jquery": "^3.5.1",
