@@ -126,7 +126,7 @@ responder.on('message', (bufferRequest) => {
             }
             break;
         case BORRAR_MENSAJES:
-            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico.toString().includes(request.topico))
+            index = colasMensajes.findIndex(colaMensajes => colaMensajes.topico.includes(request.topico))
             if (index === -1) { // Si no encuentra el index entonces el topico no está en la lista del broker
                 let error = {
                     codigo: 1,
@@ -134,7 +134,7 @@ responder.on('message', (bufferRequest) => {
                 }
                 responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, null, error)));
             } else {
-                colasMensajes = colasMensajes.filter(colaMensajes => colaMensajes.topico !== request.topico); // Filtra la cola a borrar, efectvamente borrandola
+                colasMensajes = colasMensajes.filter(colaMensajes => !colaMensajes.topico.includes(request.topico)); // Filtra la cola a borrar, efectvamente borrandola
                 responder.send(JSON.stringify(createResponse(request.accion, request.idPeticion, {})));
             }
             break;

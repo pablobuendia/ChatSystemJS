@@ -31,7 +31,7 @@ function deleteTopic() {
     
     xmlHttp.onreadystatechange = function() {
         if (this.readyState == 4 && xmlHttp.status == OK) {
-            displayText("mensajeBorrado", "Topico borrado correctamente");
+            displayText("mensajeBorrado", "Cola de mensajes del topico "+ topicToDelete + " borrado correctamente");
         } else if (xmlHttp.status >= 400) {
             displayText("mensajeBorrado", "Error al borrar el topico: " + topicToDelete + ". Response: " + xmlHttp.response + ". Status: " + xmlHttp.status + ". Readystate: " + this.readyState);
         } 
@@ -46,7 +46,13 @@ function getMessageListFromTopic() {
     let idBroker = getElementById("idBrokerTopico");
     xmlHttp.onreadystatechange = function() { 
         if (this.readyState == 4 && xmlHttp.status == OK) {
-            let messagesArray = JSON.parse(xmlHttp.responseText).resultados.mensajes.mensajes;
+            let parsedJson = JSON.parse(xmlHttp.responseText);
+            let messagesArray;
+            if (parsedJson.resultados != undefined) {
+                messagesArray = parsedJson.resultados.mensajes.mensajes;
+            } else {
+                messagesArray = [];
+            }
             displayMessagesList("tablaMensajes", messagesArray);
         } 
         else if (xmlHttp.status >= 400) {
