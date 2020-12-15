@@ -344,8 +344,7 @@ function handleGroupCommand(data) {
 
 
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
-    //console.log("Cliente comienza a sincronizarse con el servidor NTP");
-    setInterval(() => {
+    var intervalo = setInterval(() => {
 
         var T1 = (new Date()).toISOString();
         //console.log("Escribiendo desde cliente " + id_cliente + "..." + T1)
@@ -373,4 +372,13 @@ clienteNTP.on('data', function (data) {
     delay = ((T2 - T1) + (T3 - T4)) / 2;
 
     //console.log("Delay calculado para cliente " + id_cliente + ": " + delay);
+});
+
+clienteNTP.on('error', (err) => {
+    console.log("El cliente no puede comunicarse con el servidor. Se detiene la comunicacion");
+    clearInterval(intervalo);
+})
+
+clienteNTP.on('end',function(){
+    console.log("Reading end");
 });
