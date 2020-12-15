@@ -15,6 +15,7 @@ const cantidad_brokers=3;
 const REQ = 'req';
 const PUB = 'pub';
 const ALL = 'all';
+const SUB = 'sub';
 const MESSAGE = 'message/';
 const HEARTBEAT = 'heartbeat';
 
@@ -28,6 +29,8 @@ var idPeticion = 0;
 var delay = 0;
 
 var messagesReceived = [];
+var gruposSuscripto = [];
+var firstTime = true;
 
 var r1 = readline.createInterface({
     input: process.stdin,
@@ -76,19 +79,45 @@ function solicitud_Informacion_Coordinador (accion, topico, id_p){
     requester.send(peticion);
 };
 
+function addGroupIfNeeded(element) {
+        let socket = zmq.socket(SUB);
+        let socket_pub = zmq.socket(PUB);
+        let grupo = {
+            topico: element.topico,
+            sub: socket,
+            pub: socket_pub,
+            conect: false
+        }
+        socket.connect(createURlWith(element.ip, element.puerto));
+        socket.subscribe(element.topico.toString());
+        gruposSuscripto.push(grupo);
+        solicitud_Informacion_Coordinador(1, element.topico, id_cliente);
+        //prueba();
+}
+
 requester.on("message", function (reply) { //deberia volver los ip y puertos de All, heartbeat y del cliente mismo
     let response = JSON.parse(reply);
     let datos_broker = response.resultados.datosBroker;
     if (response.accion == 2){ //Si es una respuesta al pedido de datos de los brokers para suscripcion
         datos_broker.forEach(element => {
-            let asunto = new Object();
-            asunto.topico = element.topico;
-            asunto.sub = zmq.socket('sub');
-            asunto.sub.connect(createURlWith(element.ip, element.puerto));
-            asunto.sub.subscribe(element.topico.toString());
-            conexiones_suscripcion.push(asunto);
+            if (element.topico.startsWith(MESSAGE+'g_')){
+                addGroupIfNeeded(element);
+            }
+            else if(conexiones_suscripcion.findIndex((value) => value.topico == element.topico) == -1){
+                let asunto = new Object();
+                asunto.topico = element.topico;
+                asunto.sub = zmq.socket('sub');
+                asunto.sub.connect(createURlWith(element.ip, element.puerto));
+                asunto.sub.subscribe(element.topico.toString());
+                conexiones_suscripcion.push(asunto);
+            } 
         });
-        solicitud_Informacion_Coordinador(1, HEARTBEAT, idPeticion++);
+        if (firstTime){
+            solicitud_Informacion_Coordinador(1, HEARTBEAT, idPeticion++);
+            solicitud_Informacion_Coordinador(7, MESSAGE+ALL, idPeticion++); //si ya sabe cual es el puerto RR
+            solicitud_Informacion_Coordinador(7, MESSAGE+id_cliente, idPeticion++);
+            firstTime = false;
+        }
         conexiones_suscripcion.forEach((element) => { //que lo hace cuando recibe un mensaje de algun topico
             element.sub.on('message', (topic, mensaje) => {
                 topic = topic.toString();
@@ -106,8 +135,14 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
                 }
             });
         });
-        solicitud_Informacion_Coordinador(7, MESSAGE+ALL, idPeticion++); //si ya sabe cual es el puerto RR
-        solicitud_Informacion_Coordinador(7, MESSAGE+id_cliente, idPeticion++);
+        gruposSuscripto.forEach((element) => {
+            element.sub.on('message', (topic, mensaje) => {
+                mensaje = JSON.parse(mensaje);
+                if (! (isMe(mensaje.emisor))) {
+                    console.log('Has recibido un mensaje en el grupo: '+topic.toString()+':\n' + mensaje.emisor + ' : '+ mensaje.mensaje);
+                }
+            });
+        });
     }
     else if (response.accion == 1){ //Si es una respuesta al pedido de datos de un broker para publicacion
         if( datos_broker[0].topico == HEARTBEAT){
@@ -115,12 +150,20 @@ requester.on("message", function (reply) { //deberia volver los ip y puertos de 
             createHeartbeatInterval();
         }
         else{ 
-            //cuando se pide datos de un topico para publicar que no se heartbeat
-            let indice = lista_clientes_vivos.findIndex((currentValue) => MESSAGE+currentValue.id == datos_broker[0].topico);
-            if (indice != -1){
-                lista_clientes_vivos[indice].pub.connect(createURlWith(datos_broker[0].ip, datos_broker[0].puerto));
-                lista_clientes_vivos[indice].conect = true;
-                prueba();
+            if (datos_broker[0].topico.includes(MESSAGE + 'g_')) {
+                let i = gruposSuscripto.findIndex((value) => value.topico == datos_broker[0].topico);
+                if (i != -1){
+                    gruposSuscripto[i].pub.connect(createURlWith(datos_broker[0].ip, datos_broker[0].puerto));
+                    gruposSuscripto[i].conect = true;
+                }
+            } else {
+                //cuando se pide datos de un topico para publicar que no se heartbeat
+                let indice = lista_clientes_vivos.findIndex((currentValue) => MESSAGE+currentValue.id == datos_broker[0].topico);
+                if (indice != -1){
+                    lista_clientes_vivos[indice].pub.connect(createURlWith(datos_broker[0].ip, datos_broker[0].puerto));
+                    lista_clientes_vivos[indice].conect = true;
+                    prueba();
+                }
             }
         }
     }
@@ -264,8 +307,32 @@ function procesarMensaje (data){
 }
 
 r1.on('line',(data) => {
-    procesarMensaje(data.trim());
+    let trimmedData = data.trim();
+    if (trimmedData.startsWith('/group')){
+        handleGroupCommand(data);
+    } else {
+        if (data.startsWith('g_')) {
+            let splittedData = data.split(':');
+            if (gruposSuscripto.findIndex((currentValue) => currentValue.topico == MESSAGE + splittedData[0]) == -1) {
+                console.log("Debe estar suscripto al grupo para poder enviar mensajes");
+            } else {
+                enviarMensajeAGrupo(splittedData);
+            }
+        } else {
+            procesarMensaje(trimmedData);
+        }
+    }
 });
+
+function handleGroupCommand(data) {
+    let splittedData = data.split(' ');
+    if (splittedData.length > 1) {
+        solicitud_Informacion_Coordinador(2, MESSAGE + splittedData[1], id_cliente); //pide el ip y puerto para publicar en el grupo
+    } else {
+        console.log("Para ingresar un grupo debe indicar /group 'g_IDGRUPO'");
+    }
+    
+}
 
 
 var clienteNTP = net.createConnection(puertoNTP, "127.0.0.1", function () {
