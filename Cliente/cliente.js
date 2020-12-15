@@ -302,6 +302,18 @@ function procesarMensaje (data){
     };
 }
 
+function enviarMensajeAGrupo(data) {
+    let index = gruposSuscripto.findIndex((currentValue) => currentValue.topico == MESSAGE + data[0]);
+    let mensaje = new Object();
+    mensaje.emisor = id_cliente;
+    mensaje.mensaje = data[1];
+    mensaje.fecha = new Date().toISOString();
+    mensaje = JSON.stringify(mensaje);
+
+    // Envia mensaje a grupo
+    gruposSuscripto[index].pub.send([MESSAGE+data[0], mensaje]);
+}
+
 r1.on('line',(data) => {
     let trimmedData = data.trim();
     if (trimmedData.startsWith('/group')){
